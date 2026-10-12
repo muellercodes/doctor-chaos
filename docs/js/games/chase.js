@@ -24,6 +24,7 @@ export async function play(G, P) {
   const canvas = document.getElementById('c2d');
   const ctx = canvas.getContext('2d');
   canvas.classList.remove('hidden');
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   E.paused3D = true;
   music.play('chase');
   ui.showHUD(false);

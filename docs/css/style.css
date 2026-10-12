@@ -52,7 +52,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd9d2; fon
 .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--ink); background: #fff; font-size: 18px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); font-family: var(--font); display: grid; place-items: center; padding: 0; }
 .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 
-.hint { top: 64px; left: 50%; transform: translateX(-50%); background: rgba(29,43,54,0.88); color: #fff; padding: 9px 18px; border-radius: 16px; font-size: 18px; text-align: center; max-width: min(92vw, 640px); line-height: 1.3; }
+.hint { top: 64px; left: 50%; transform: translateX(-50%); width: max-content; background: rgba(29,43,54,0.88); color: #fff; padding: 9px 18px; border-radius: 16px; font-size: 18px; text-align: center; max-width: min(92vw, 640px); line-height: 1.3; }
 .hint b { color: var(--yellow); }
 .timer { top: 64px; right: 14px; background: #fff; border: 3px solid var(--ink); border-radius: 14px; padding: 4px 12px; font-weight: 700; font-size: 20px; box-shadow: 0 3px 0 var(--ink); }
 .timer.low { background: #ffe0e5; color: #c21d3b; animation: pulse 0.6s infinite; }
@@ -91,7 +91,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd9d2; fon
 @keyframes slideIn { from { transform: translateX(-40px) rotate(-1.5deg); opacity: 0; } }
 
 /* ---------- tool tray ---------- */
-.tray { left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(255,250,240,0.96); border: 3px solid var(--ink); border-radius: 22px; padding: 8px 10px 10px; box-shadow: 0 6px 0 var(--ink); text-align: center; pointer-events: auto; max-width: calc(100vw - 16px); animation: slideUp 0.25s ease-out; }
+.tray { left: 50%; bottom: 12px; transform: translateX(-50%); width: max-content; background: rgba(255,250,240,0.96); border: 3px solid var(--ink); border-radius: 22px; padding: 8px 10px 10px; box-shadow: 0 6px 0 var(--ink); text-align: center; pointer-events: auto; max-width: calc(100vw - 16px); animation: slideUp 0.25s ease-out; }
 .tray.shake { animation: shake 0.4s; }
 @keyframes shake { 20% { transform: translateX(calc(-50% - 10px)); } 40% { transform: translateX(calc(-50% + 10px)); } 60% { transform: translateX(calc(-50% - 6px)); } 80% { transform: translateX(calc(-50% + 6px)); } }
 .tray-title { font-weight: 700; font-size: 15px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--teal-d); margin-bottom: 6px; }
@@ -273,7 +273,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd9d2; fon
   .icon-btn { width: 34px; height: 34px; font-size: 15px; }
   .hint { top: 54px; font-size: 15px; padding: 7px 12px; }
   .timer { top: 100px; font-size: 16px; }
-  .chart { top: 54px; width: min(240px, 62vw); padding: 18px 10px 8px; }
+  .chart { top: 54px; width: min(240px, 58vw); padding: 16px 10px 6px; }
+  .chart-row.complaint { font-size: 13px; }
   .chart-row { font-size: 14px; }
   .chart-note { font-size: 13px; }
   .tool { width: 62px; padding: 4px 2px; border-radius: 13px; }

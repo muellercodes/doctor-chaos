@@ -38,10 +38,10 @@ export function createUI(root, E) {
   const hudDay = h('div', 'pill', 'Day 1'); const hudPat = h('div', 'pill', ''); const hudMoney = h('div', 'pill money', '$0');
   const muteBtn = h('button', 'icon-btn interactive', '🔊');
   muteBtn.title = 'Sound on/off';
-  muteBtn.onclick = () => { sfx.setMuted(!sfx.muted); muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; ui.onMute && ui.onMute(sfx.muted); };
+  muteBtn.onclick = () => { muteBtn.blur(); sfx.setMuted(!sfx.muted); muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; ui.onMute && ui.onMute(sfx.muted); };
   const fsBtn = h('button', 'icon-btn interactive', '⛶');
   fsBtn.title = 'Fullscreen';
-  fsBtn.onclick = () => { try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) { /* ignore */ } };
+  fsBtn.onclick = () => { fsBtn.blur(); try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) { /* ignore */ } };
   hud.append(hudDay, hudPat, hudMoney, h('div', 'spacer'), muteBtn, fsBtn);
   ui.syncMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; };
   ui.showHUD = v => hud.classList.toggle('hidden', !v);

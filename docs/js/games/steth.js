@@ -110,6 +110,7 @@ export async function play(G, P, prm = {}) {
   }
   // ---- rhythm ----
   ui.hint('<b>Tap along</b> with the heartbeat! Click or press <b>Space</b> when each beat hits the line.');
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   const lane = S.dom(h('div', 'lane'));
   lane.innerHTML = '<div class="lane-line"></div><div class="lane-label">❤ tap on the beat</div>';
   ui.root.appendChild(lane);
