@@ -337,6 +337,8 @@ function specialPatient(type, ageGroup, gender) {
   return null;
 }
 
+export const personaPatient = name => (PERSONALITIES[name] ? PERSONALITIES[name]() : null);
+
 // ---------- day generation ----------
 const ALL_STEPS = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'cast'];
 

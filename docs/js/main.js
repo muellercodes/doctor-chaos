@@ -513,8 +513,8 @@ if (test) {
     state.seen = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'cast', 'chase', 'baby', 'sneeze', 'hide'];
     ui.loadSeen(state.seen);
     const step = test;
-    let c;
-    if (['runner', 'baby', 'sneezy', 'hider'].includes(step)) c = D.generateDay(3).find(x => x.special === step) || null;
+    let c = step.startsWith('p-') ? D.personaPatient(step.slice(2)) : null;
+    if (!c && ['runner', 'baby', 'sneezy', 'hider'].includes(step)) c = D.generateDay(3).find(x => x.special === step) || null;
     if (!c && ['runner', 'baby', 'sneezy', 'hider'].includes(step)) {
       for (let k = 0; k < 40 && !c; k++) c = D.generateDay(4).find(x => x.special === step);
     }

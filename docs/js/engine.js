@@ -177,7 +177,7 @@ export function createEngine(canvas) {
   const HOME_POS = new THREE.Vector3(0, 1.75, 3.7);
   const HOME_TARGET = new THREE.Vector3(0, 1.0, 0);
   function home(dur = 0.9) {
-    return frame(new THREE.Vector3(0, 1.15, 0), 3.0, 2.1, HOME_POS.clone().sub(HOME_TARGET), dur, 1.0);
+    return frame(new THREE.Vector3(0, 1.22, 0), 3.1, 2.3, HOME_POS.clone().sub(HOME_TARGET), dur, 1.0);
   }
   function shake(a) { shakeAmt = Math.max(shakeAmt, a); }
 
