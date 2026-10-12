@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Doctor Chaos</title>
+  <meta name="description" content="A goofy 3D doctor game. Five patients a day, a lot of chaos, and a very real chance of getting sued. Designed by Linus.">
+  <meta name="theme-color" content="#2bb3a3">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:title" content="Doctor Chaos">
+  <meta property="og:description" content="Five patients a day. One doctor. Zero medical degrees. Malpractice makes perfect.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">{ "imports": { "three": "./js/vendor/three.module.min.js" } }</script>
+</head>
+<body>
+  <div id="app">
+    <canvas id="gl"></canvas>
+    <canvas id="c2d" class="hidden"></canvas>
+    <div id="ui"></div>
+    <div id="title" class="hidden">
+      <div class="title-inner">
+        <div class="logo" aria-label="Doctor Chaos">
+          <span class="w1"><i>D</i><i>O</i><i>C</i><i>T</i><i>O</i><i>R</i></span>
+          <span class="w2"><i>C</i><i>H</i><i>A</i><i>O</i><i>S</i></span>
+        </div>
+        <div class="tagline">Malpractice makes perfect.</div>
+        <div class="title-buttons"></div>
+        <div class="credits">Game design by <b>Linus</b> · Built with Three.js · Best with sound on 🔊</div>
+      </div>
+    </div>
+    <div id="loading">Scrubbing in…</div>
+    <noscript><div class="noscript">Doctor Chaos needs JavaScript turned on.</div></noscript>
+  </div>
+  <script type="module" src="js/main.js"></script>
+  <script>
+    // show an error on the loading screen if something fails to load
+    window.addEventListener('error', function (e) {
+      var l = document.getElementById('loading');
+      if (l) l.textContent = 'Uh oh, something broke: ' + (e.message || 'unknown error');
+    });
+  </script>
+</body>
+</html>
