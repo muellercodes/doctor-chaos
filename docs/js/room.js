@@ -49,6 +49,7 @@ export function buildRoom(scene) {
   // ---------- lights ----------
   const hemi = new THREE.HemisphereLight('#ffffff', '#7fb8ae', 1.7);
   scene.add(hemi);
+  R.hemi = hemi;
   const sun = new THREE.DirectionalLight('#fff3df', 2.3);
   sun.position.set(2.5, 6.5, 4.0);
   sun.castShadow = true;
@@ -256,7 +257,7 @@ export function buildRoom(scene) {
     const lab = planeTex(0.6, 0.2, textPoster([{ text: 'SUPPLIES', size: 72, bold: true }], { w: 512, h: 170, border: '#1d2b36' }), 0.025, 1.65, -0.48, Math.PI / 2);
     dp.add(lab);
     g.add(dp);
-    const s = spot('cabinet', 'supply cabinet', g, new THREE.Vector3(-3.7, 0, -0.45), { pan: -0.9 });
+    const s = spot('cabinet', 'supply cabinet', g, new THREE.Vector3(-3.65, 0, -0.45), { pan: -0.9 });
     s.tell = E => E.tween(0.6, (k, raw) => { dp.rotation.y = Math.sin(raw * Math.PI * 6) * 0.08 * (1 - raw); }, ease.linear);
     s.open = E => E.tween(0.4, k => { dp.rotation.y = k * 1.5; });
     s.close = E => E.tween(0.4, k => { dp.rotation.y = 1.5 * (1 - k); });
@@ -291,7 +292,7 @@ export function buildRoom(scene) {
     const lid = new THREE.Group(); lid.position.set(0, 0.73, 0);
     lid.add(cyl(0.3, 0.3, 0.05, '#a47c48', 0, 0, 0, 20)); lid.add(sph(0.04, '#a47c48', 0, 0.04, 0, 8));
     g.add(lid);
-    const s = spot('hamper', 'laundry hamper', g, new THREE.Vector3(3.5, 0, 0.6), { pan: 0.9 });
+    const s = spot('hamper', 'laundry hamper', g, new THREE.Vector3(3.2, 0, 0.75), { pan: 0.9 });
     s.tell = E => E.tween(0.7, (k, raw) => { lid.position.y = 0.73 + Math.abs(Math.sin(raw * Math.PI * 3)) * 0.08; lid.rotation.z = Math.sin(raw * 18) * 0.15; }, ease.linear);
     s.open = E => E.tween(0.35, k => { lid.position.y = 0.73 + 0.3 * k; lid.rotation.z = 0.9 * k; lid.position.x = 0.25 * k; });
     s.close = E => E.tween(0.35, k => { lid.position.y = 1.03 - 0.3 * k; lid.rotation.z = 0.9 * (1 - k); lid.position.x = 0.25 * (1 - k); });
@@ -311,7 +312,7 @@ export function buildRoom(scene) {
       leaf.rotation.set(Math.sin(a) * 0.5, -a, Math.cos(a) * 0.5);
       leaves.add(leaf);
     }
-    const s = spot('plant', 'big plant', g, new THREE.Vector3(-3.6, 0, -1.6), { pan: -0.9 });
+    const s = spot('plant', 'big plant', g, new THREE.Vector3(-3.4, 0, -1.3), { pan: -0.9 });
     s.tell = E => E.tween(0.8, (k, raw) => { leaves.rotation.z = Math.sin(raw * 30) * 0.08 * (1 - raw); leaves.rotation.x = Math.cos(raw * 26) * 0.06 * (1 - raw); }, ease.linear);
     s.open = E => E.tween(0.4, (k, raw) => { leaves.rotation.z = Math.sin(raw * 30) * 0.2; });
     s.close = () => Promise.resolve();
@@ -327,7 +328,7 @@ export function buildRoom(scene) {
     const eyes = new THREE.Group(); eyes.position.set(0, 0.5, 0.05); eyes.visible = false;
     for (const x of [-0.05, 0.05]) { eyes.add(sph(0.035, '#ffffff', x, 0, 0, 10)); eyes.add(sph(0.016, '#1d2b36', x, 0, 0.028, 8)); }
     g.add(eyes);
-    const s = spot('trash', 'trash can', g, new THREE.Vector3(-1.5, 0, 1.3), { pan: -0.4 });
+    const s = spot('trash', 'trash can', g, new THREE.Vector3(-1.2, 0, 1.45), { pan: -0.4 });
     s.tell = async E => { eyes.visible = true; await E.tween(1.0, (k, raw) => { lid.rotation.x = -Math.sin(raw * Math.PI) * 0.7; eyes.position.y = 0.5 + Math.sin(raw * Math.PI) * 0.06; }, ease.linear); eyes.visible = false; };
     s.open = E => E.tween(0.3, k => { lid.rotation.x = -1.4 * k; });
     s.close = E => E.tween(0.3, k => { lid.rotation.x = -1.4 * (1 - k); });
@@ -341,7 +342,7 @@ export function buildRoom(scene) {
     g.add(lab);
     const f1 = new THREE.Group(); f1.position.set(-0.31, 0.5, 0); f1.add(box(0.31, 0.012, 0.5, '#c8955a', 0.155, 0, 0)); g.add(f1);
     const f2 = new THREE.Group(); f2.position.set(0.31, 0.5, 0); f2.add(box(0.31, 0.012, 0.5, '#c8955a', -0.155, 0, 0)); g.add(f2);
-    const s = spot('box', 'cardboard box', g, new THREE.Vector3(2.3, 0, 1.5), { pan: 0.5 });
+    const s = spot('box', 'cardboard box', g, new THREE.Vector3(2.05, 0, 1.85), { pan: 0.5 });
     s.tell = E => E.tween(0.7, (k, raw) => { const a = Math.abs(Math.sin(raw * Math.PI * 3)) * 0.6; f1.rotation.z = a; f2.rotation.z = -a; }, ease.linear);
     s.open = E => E.tween(0.3, k => { f1.rotation.z = 2.2 * k; f2.rotation.z = -2.2 * k; });
     s.close = E => E.tween(0.3, k => { f1.rotation.z = 2.2 * (1 - k); f2.rotation.z = -2.2 * (1 - k); });

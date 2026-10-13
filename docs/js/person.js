@@ -215,7 +215,7 @@ export class Person {
     for (const k of JOINTS) { this.cur[k] = BASE[k].slice(); this.target[k] = BASE[k].slice(); this.off[k] = [0, 0, 0]; }
     this.poseName = 'stand';
     this.poseSpeed = 9;
-    this.walking = 0; this.walkPhase = 0;
+    this.walkAmt = 0; this.walkTarget = 0; this.walkSpeed = 1; this.walkPhase = 0; this.running = false;
     this.wiggle = 0; this.shiver = 0; this.bounce = 0;
     this.lookYaw = 0; this.lookPitch = 0;
     this.breath = rand(0, 6);
@@ -352,16 +352,18 @@ export class Person {
     const k = 1 - Math.exp(-dt * this.poseSpeed);
     for (const jn of JOINTS) { const c = this.cur[jn], tg = this.target[jn]; for (let i = 0; i < 3; i++) c[i] += (tg[i] - c[i]) * k; }
     this.applyJoints(t);
-    // walking
-    if (this.walking > 0) {
-      this.walkPhase += dt * 9 * this.walking;
+    // walking (blended in and out so legs never snap)
+    this.walkAmt += (this.walkTarget - this.walkAmt) * Math.min(1, dt * 8);
+    if (this.walkAmt > 0.01) {
+      this.walkPhase += dt * 9 * this.walkSpeed;
       const s = Math.sin(this.walkPhase);
-      const amp = this.running ? 0.9 : 0.55;
+      const w = this.walkAmt;
+      const amp = (this.running ? 0.9 : 0.55) * w;
       this.j.hipL.rotation.x += s * amp; this.j.hipR.rotation.x -= s * amp;
       this.j.knL.rotation.x += Math.max(0, -s) * amp * 1.2; this.j.knR.rotation.x += Math.max(0, s) * amp * 1.2;
       this.j.shL.rotation.x -= s * amp * 0.9; this.j.shR.rotation.x += s * amp * 0.9;
-      if (this.running) { this.j.elL.rotation.x -= 1.2; this.j.elR.rotation.x -= 1.2; this.j.shL.rotation.z += 0.4; this.j.shR.rotation.z -= 0.4; }
-      this.body.position.y = Math.abs(Math.cos(this.walkPhase)) * 0.03;
+      if (this.running) { this.j.elL.rotation.x -= 1.2 * w; this.j.elR.rotation.x -= 1.2 * w; this.j.shL.rotation.z += 0.4 * w; this.j.shR.rotation.z -= 0.4 * w; }
+      this.body.position.y = Math.abs(Math.cos(this.walkPhase)) * 0.03 * w;
     } else this.body.position.y = 0;
     // breathing / idle
     this.breath += dt;
@@ -385,56 +387,92 @@ export class Person {
   headCenter() { const v = new THREE.Vector3(0, 0.15, 0); this.j.head.localToWorld(v); return v; }
   wp(obj, x = 0, y = 0, z = 0) { this.root.updateMatrixWorld(true); return obj.localToWorld(new THREE.Vector3(x, y, z)); }
 
-  async walkTo(E, x, z, speed = 1.3, run = false) {
-    const p0 = this.root.position.clone();
-    const dx = x - p0.x, dz = z - p0.z;
-    const d = Math.hypot(dx, dz);
-    if (d < 0.01) return;
-    const ry = Math.atan2(dx, dz);
-    this.root.rotation.y = ry;
-    this.walking = run ? 1.6 : 1; this.running = run;
+  // Walk along a list of {x, z} points, turning smoothly and never snapping.
+  walkPath(E, pts, speed = 1.4, run = false) {
+    const list = pts.filter(Boolean);
+    if (!list.length) return Promise.resolve();
+    this.running = run; this.walkSpeed = run ? 1.6 : 1; this.walkTarget = 1;
     this.setPose(run ? 'run' : 'stand');
-    await E.tween(d / speed, k => { this.root.position.x = p0.x + dx * k; this.root.position.z = p0.z + dz * k; }, v => v);
-    this.walking = 0; this.running = false;
-  }
-  async faceTo(E, ry, dur = 0.25) { const r0 = this.root.rotation.y; let d = ry - r0; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; await E.tween(dur, k => { this.root.rotation.y = r0 + d * k; }); }
-  async hopOnTable(E) {
-    const p0 = this.root.position.clone();
-    const r0 = this.root.rotation.y;
-    this.setPose('sit');
-    await E.tween(0.55, k => {
-      this.root.position.x = p0.x + (0 - p0.x) * k;
-      this.root.position.z = p0.z + (0.24 - p0.z) * k;
-      this.root.position.y = p0.y + (this.sitY - p0.y) * k + Math.sin(k * Math.PI) * 0.25;
-      this.root.rotation.y = r0 * (1 - k);
+    let i = 0;
+    return new Promise(res => {
+      const off = E.onUpdate(dt => {
+        const tg = list[i];
+        const p = this.root.position;
+        const dx = tg.x - p.x, dz = tg.z - p.z, d = Math.hypot(dx, dz);
+        const step = speed * dt;
+        if (d > 0.001) {
+          const want = Math.atan2(dx, dz);
+          let dy = want - this.root.rotation.y;
+          while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
+          this.root.rotation.y += dy * Math.min(1, dt * 12);
+        }
+        if (step >= d) {
+          p.x = tg.x; p.z = tg.z; i++;
+          if (i >= list.length) { off(); this.walkTarget = 0; this.running = false; res(); }
+        } else { p.x += dx / d * step; p.z += dz / d * step; }
+      });
     });
   }
-  async hopOff(E, x = 0.55, z = 0.95) {
+  walkTo(E, x, z, speed = 1.4, run = false) { return this.walkPath(E, [{ x, z }], speed, run); }
+  async faceTo(E, ry, dur = 0.3) { const r0 = this.root.rotation.y; let d = ry - r0; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; if (Math.abs(d) < 0.01) return; await E.tween(dur, k => { this.root.rotation.y = r0 + d * k; }); }
+  // From standing in front of the table (facing the camera), hop backwards onto it.
+  async hopOnTable(E, x = 0) {
+    await this.faceTo(E, 0, 0.3);
+    const p0 = this.root.position.clone();
+    this.setPose('sit');
+    const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    await E.tween(0.6, (e, k) => {
+      const back = sm(0.25, 1, k);
+      this.root.position.x = p0.x + (x - p0.x) * back;
+      this.root.position.z = p0.z + (0.24 - p0.z) * back;
+      this.root.position.y = p0.y + (this.sitY - p0.y) * sm(0, 1, k) + Math.sin(k * Math.PI) * 0.2;
+    }, t => t);
+    this.root.position.set(x, this.sitY, 0.24);
+    this.root.rotation.set(0, 0, 0, 'YXZ');
+  }
+  // From sitting on the table, hop forward onto the floor in front of it.
+  async hopOff(E, x = 0, z = 1.0) {
     const p0 = this.root.position.clone();
     this.setPose('stand');
-    await E.tween(0.45, k => {
-      this.root.position.x = p0.x + (x - p0.x) * k;
-      this.root.position.z = p0.z + (z - p0.z) * k;
-      this.root.position.y = p0.y + (this.standY - p0.y) * k + Math.sin(k * Math.PI) * 0.18;
-    });
+    const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+    await E.tween(0.55, (e, k) => {
+      const fwd = sm(0, 0.6, k);
+      this.root.position.x = p0.x + (x - p0.x) * fwd;
+      this.root.position.z = p0.z + (z - p0.z) * fwd;
+      this.root.position.y = p0.y + (this.standY - p0.y) * sm(0.2, 1, k) + Math.sin(k * Math.PI) * 0.15;
+    }, t => t);
   }
+  // Lie back on the table: tilt back with knees up, swing around, then straighten the legs.
   async lieDown(E) {
     const p0 = this.root.position.clone();
-    this.setPose('lie');
     this.root.rotation.order = 'YXZ';
-    await E.tween(0.8, k => {
-      this.root.position.set(p0.x + (0.25 - p0.x) * k, p0.y + (this.lieY - p0.y) * k + Math.sin(k * Math.PI) * 0.12, p0.z + (0 - p0.z) * k);
-      this.root.rotation.set(-Math.PI / 2 * k, Math.PI / 2 * k, 0, 'YXZ');
-    });
+    this.setPose('sit');
+    const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+    await E.tween(1.0, (e, k) => {
+      const tilt = sm(0, 0.45, k), turn = sm(0.4, 0.9, k);
+      this.root.rotation.set(-Math.PI / 2 * tilt, Math.PI / 2 * turn, 0, 'YXZ');
+      this.root.position.set(p0.x + (0.25 - p0.x) * turn, p0.y + (this.lieY - p0.y) * tilt + Math.sin(tilt * Math.PI) * 0.06, p0.z + (0.1 - p0.z) * tilt + (0 - 0.1) * turn);
+    }, t => t);
+    this.root.position.set(0.25, this.lieY, 0);
+    this.root.rotation.set(-Math.PI / 2, Math.PI / 2, 0, 'YXZ');
+    this.setPose('lie');
+    await E.wait(0.35);
     this.lying = true;
   }
+  // Reverse of lieDown: knees up, swing back around, sit up.
   async sitUp(E) {
-    const p0 = this.root.position.clone();
+    this.root.rotation.order = 'YXZ';
     this.setPose('sit');
-    await E.tween(0.7, k => {
-      this.root.position.set(p0.x + (0 - p0.x) * k, p0.y + (this.sitY - p0.y) * k + Math.sin(k * Math.PI) * 0.1, p0.z + (0.24 - p0.z) * k);
-      this.root.rotation.set(-Math.PI / 2 * (1 - k), Math.PI / 2 * (1 - k), 0, 'YXZ');
-    });
+    await E.wait(0.3);
+    const p0 = this.root.position.clone();
+    const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+    await E.tween(0.9, (e, k) => {
+      const turn = sm(0, 0.5, k), tilt = sm(0.45, 1, k);
+      this.root.rotation.set(-Math.PI / 2 * (1 - tilt), Math.PI / 2 * (1 - turn), 0, 'YXZ');
+      this.root.position.set(p0.x + (0 - p0.x) * turn, p0.y + (this.sitY - p0.y) * tilt + Math.sin(tilt * Math.PI) * 0.06, p0.z + (0.1 - p0.z) * turn + (0.24 - 0.1) * tilt);
+    }, t => t);
+    this.root.position.set(0, this.sitY, 0.24);
+    this.root.rotation.set(0, 0, 0, 'YXZ');
     this.lying = false;
   }
   // useful world points

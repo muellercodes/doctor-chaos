@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { clamp, rand, pick } from '../engine.js';
 import { h } from '../ui.js';
+import { route, SPOTS } from '../nav.js';
 
 export async function play(G, P) {
   const { E, ui, sfx, room } = G;
@@ -89,11 +90,11 @@ export async function play(G, P) {
   label.remove();
   try { await spot.close(E); } catch (e) { /* ignore */ }
   S.end();
-  // walk back to the table
+  // walk back to the table, around the furniture
   person.setPose('stand');
   await E.home(0.8);
-  await person.walkTo(E, 0.0, 0.95, 2.2);
-  await person.faceTo(E, 0);
+  const p0 = person.root.position;
+  await person.walkPath(E, route({ x: p0.x, z: p0.z }, SPOTS.front), 2.2);
   await person.hopOnTable(E);
   person.expr('smile');
   return { score: clamp(100 - tries * 20, 40, 100), fail: false };

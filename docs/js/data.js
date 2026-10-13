@@ -1,5 +1,6 @@
 import { pick, shuffle, randi, rand } from './engine.js';
 import { OBJECT_NAMES } from './props.js';
+import { pickExcuse, uniqueLine } from './excuses.js';
 
 export const STEP_TOOL = { removal: 'tweezers', shot: 'shot', blood: 'blood', surgery: 'surgery', reflex: 'reflex', steth: 'steth', cast: 'cast', babyshot: 'shot' };
 export const STEP_NOTE = {
@@ -63,54 +64,13 @@ function baseCase(ageGroup, gender) {
 // ---------- complaint templates ----------
 const SMALL_OBJ = ['lego', 'marble', 'dice', 'crayon', 'dino', 'airpod', 'coin', 'button', 'jellybean'];
 const BIG_OBJ = ['duck', 'remote', 'harmonica', 'chicken', 'toycar', 'spoon', 'sock'];
+// Blood test lines are unchanged on purpose (Linus: "blood being drawn is fine as is").
 const C = {
-  removal: {
-    kid: ['I wanted to see if a {obj} fits in my {where}. Good news: it does.', "My brother said I couldn't fit a {obj} in my {where}. I proved him wrong. Now I need help.", "There's a {obj} in my {where}. I didn't put it there. (I put it there.)"],
-    teen: ["Okay so there's a {obj} in my {where} and I need this fixed before anyone at school finds out.", 'I was trying a life hack. The life hack put a {obj} in my {where}.'],
-    adult: ['I have a {obj} stuck in my {where}. My kid dared me. I am a grown adult. I took the dare.', 'I sneezed, and somehow a {obj} ended up IN my {where}. Science cannot explain it.'],
-    elder: ['I put my {obj} somewhere safe. Turns out it was my {where}.', "There's a {obj} in my {where}. Been there since 1987. I'd like it back now."],
-  },
-  shot: {
-    kid: ["Mom says I need a shot. Mom also once said broccoli was 'tree candy,' so I don't trust anyone here.", "I'm getting my school shots. I'm not scared. YOU'RE scared. ...Is it a big needle?"],
-    teen: ['I need my booster shot. Can you make it quick? My group chat is on fire right now.', 'Shot time. If I pass out, tell everyone I got hurt doing something cool.'],
-    adult: ['I stepped on a rusty nail. In my defense, the nail started it.', "I'm going on a trip and they said I need a shot. ONE shot. Right? ...Right?"],
-    elder: ["Flu shot, please. I've outlived three doctors. No pressure.", "Give me the shot. I once fought a goose in 1974. I'm not afraid of a needle."],
-  },
   blood: {
     kid: ["The doctor wants to check my blood. Is it blue inside? Jayden said it's blue inside.", "I need a blood test. Can I watch? I want to see if I'm a robot."],
     teen: ["Blood test. If I faint, make it look like I'm just resting dramatically.", "They want to check my blood. Probably just to confirm I'm 90% pizza."],
     adult: ['Routine blood test. My smartwatch says I am mostly coffee.', 'They want to check my iron levels. I think I might be part robot.'],
     elder: ["Blood test again. Take what you need. I'm 90, I've been making the stuff for ages.", "They want my blood. Again. What are they DOING with it all?"],
-  },
-  appendix: {
-    kid: ["My tummy hurts on the right side. Like, REALLY hurts. Like it's mad at me."],
-    teen: ['Bad pain on my right side. I googled it. Google says I have 47 diseases.'],
-    adult: ['Sharp pain on my right side. I think my appendix is starting a rebellion.'],
-    elder: ["My appendix has been grumbling since the '80s. Today it's yelling."],
-  },
-  swallowed: {
-    kid: ['I swallowed my {obj}. It was an accident. Mostly.', 'I swallowed a whole {obj}. Now my belly makes noises.'],
-    teen: ['So I may have swallowed a {obj}. Long story. It involves a video challenge.'],
-    adult: ['I swallowed a {obj} on a bet. I won the bet. I lost the {obj}.', 'My belly squeaks when I walk. Might be the {obj} I swallowed at the office party.'],
-    elder: ['I swallowed a {obj}. At my age, you stop asking questions.'],
-  },
-  reflex: {
-    kid: ['Sports physical for soccer! Coach says I need my reflexes checked.', 'School checkup! I have super fast reflexes. Watch. ...Okay, I missed it.'],
-    teen: ["School sports physical. Please don't make it weird."],
-    adult: ["Yearly checkup. I'm begging you, don't use the little hammer. ...You're going to use the hammer."],
-    elder: ['My knees make a noise like popcorn. Just check em.'],
-  },
-  steth: {
-    kid: ['My heart goes BOOM BOOM really fast when I play video games. Is that normal?'],
-    teen: ['My heart feels fluttery. Could be stress. Could be the three energy drinks.'],
-    adult: ["My heart's been doing a drum solo lately."],
-    elder: ["Checkup. Just make sure the old ticker's still ticking."],
-  },
-  cast: {
-    kid: ['I tried to skateboard down the stairs. The stairs won.', 'I fell off the monkey bars. The monkey bars are fine.'],
-    teen: ['Broke my arm trying to backflip off the couch. The couch is also broken.'],
-    adult: ['I fell off a trampoline. Onto another trampoline. Then onto the ground.', "I broke my arm arm-wrestling my grandma. She's fine. She's still undefeated."],
-    elder: ['Broke my wrist doing a cartwheel at my 80th birthday. Totally worth it.'],
   },
 };
 
@@ -154,6 +114,8 @@ export const LAWSUIT = {
   chase: "I was chased through the hospital by a doctor. Suing for 'cardio I did not agree to.'",
   baby: "The baby can't sue. The baby's mom CAN. The baby's mom DID.",
   steth: 'The doctor tickled me for ten minutes and called it a checkup.',
+  scooter: "I escaped on a scooter and the doctor let me. Now I'm suing for my own escape. It makes sense to me.",
+  triplets: "The doctor gave a shot to the WRONG triplet. Twice. Our mom is very upset. And confused.",
 };
 export const REVIEWS = {
   3: ['Barely felt a thing. Would get injured again.', 'Fast, friendly, and only a little terrifying.', 'Gave me a lollipop AND my dignity back.', '10/10. The doctor did not scream even once.', 'Best doctor I ever had. And I have had SEVEN this year.'],
@@ -171,110 +133,118 @@ function fill(t, c, step) {
   return t.replace(/\{obj\}/g, obj).replace(/\{where\}/g, where);
 }
 
-function addStep(c, step) {
+// `used` is the saved Set of excuses that have already been said. Blood tests skip it.
+function addStep(c, step, used) {
   c.steps.push(step);
   if (step === 'removal') {
     const o = pick(SMALL_OBJ);
     c.params.removal = { object: o, where: pick(['ear', 'nose']), name: OBJECT_NAMES[o] };
-    return fill(pick(C.removal[c.ageGroup]), c, 'removal');
+    return pickExcuse('removal', c.ageGroup, used, { obj: c.params.removal.name, where: c.params.removal.where });
   }
   if (step === 'surgery') {
     if (Math.random() < 0.45) {
       c.params.surgery = { variant: 'appendix', object: 'appendix', name: 'angry appendix' };
-      return pick(C.appendix[c.ageGroup]);
+      return pickExcuse('appendix', c.ageGroup, used);
     }
     const o = pick(BIG_OBJ);
     c.params.surgery = { variant: 'object', object: o, name: OBJECT_NAMES[o] };
-    return fill(pick(C.swallowed[c.ageGroup]), c, 'surgery');
+    return pickExcuse('swallowed', c.ageGroup, used, { obj: c.params.surgery.name });
   }
+  if (step === 'blood') return pick(C.blood[c.ageGroup]);
   if (step === 'steth') c.params.steth = { variant: 'normal' };
-  return pick(C[step][c.ageGroup]);
+  return pickExcuse(step, c.ageGroup, used);
 }
 
-export function normalPatient(ageGroup, gender, step) {
+export function normalPatient(ageGroup, gender, step, used = new Set()) {
   const c = baseCase(ageGroup, gender);
-  c.complaint = addStep(c, step);
+  c.complaint = addStep(c, step, used);
   c.remarks = REMARKS[ageGroup];
   return c;
 }
 
+// choose one of a persona's lines nobody has heard yet
+const line = (kind, list, used) => uniqueLine(kind, list, used);
+
 const PERSONALITIES = {
-  vampire() {
+  vampire(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Vlad', name: 'Count Vlad Nightshade', age: 547, ageLabel: '547 (he says 29)', voice: 0.7, personality: 'vampire' });
     Object.assign(c.look, { skin: '#ece6f5', hair: { style: 'slick', color: '#111111' }, shirt: '#1a1a2e', pants: '#1a1a2e', shoes: '#111111', outfit: 'vampire', glasses: false, beard: null, stripes: null, sleeves: 'long' });
     c.steps = ['blood'];
-    c.complaint = 'I am here for a blood test. Yes. I am aware of the irony.';
+    c.complaint = line('vampire', ['I am here for a blood test. Yes. I am aware of the irony.', 'Blood test, please. For once, I am the one giving. Do not get used to it.', 'My doctor wants a blood sample. I have plenty. Most of it is borrowed.'], used);
     c.remarks = ['Careful with that. It is vintage.', 'In my day, we did this with our teeth.', 'Do you need my ID? It is from the 1400s.', 'Mmm. Smells... no. No. Focus, Vlad.'];
     c.success = 'Hmm. Delicious work. I mean, nice work. NICE work.';
     return c;
   },
-  pirate() {
+  pirate(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Barnaby', name: 'Captain Barnaby Saltbeard', ageLabel: String(c.age), voice: 0.78, personality: 'pirate' });
     Object.assign(c.look, { hair: { style: 'short', color: '#3b2a20' }, beard: 'full', outfit: 'pirate', stripes: ['#ffffff', '#e63946'], glasses: false, pants: '#2b2d42' });
     c.steps = ['removal'];
     c.params.removal = { object: 'coin', where: 'ear', name: 'gold doubloon' };
-    c.complaint = "Arr, there be a doubloon stuck in me ear, doc. Long story. Involves a parrot.";
-    c.remarks = ["Arr, careful! That be me GOOD ear!", "If ye find any treasure in there, it be MINE.", 'Me parrot did this. Me parrot is grounded.'];
+    c.complaint = line('pirate', ['Arr, there be a doubloon stuck in me ear, doc. Long story. Involves a parrot.', "Ahoy! A gold coin be stuck in me ear. Me crew bet I couldn't hide treasure there. I could.", 'Arr, me parrot buried treasure in me ear while I slept. Dig it out, doc!'], used);
+    c.remarks = ['Arr, careful! That be me GOOD ear!', 'If ye find any treasure in there, it be MINE.', 'Me parrot did this. Me parrot is grounded.'];
     c.success = "ARRR! Ye've done it! Here, have a doubloon. ...Not THAT one.";
     return c;
   },
-  trench() {
+  trench(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Greg', name: 'Totally Normal Adult Man (Greg)', ageLabel: '47 (human years)', voice: 1.45, personality: 'trench' });
     Object.assign(c.look, { tall: 1.28, outfit: 'trench', glasses: 'sun', beard: null, hair: { style: 'none', color: '#3b2a20' }, shirt: '#b08d57', pants: '#2b2d42', sleeves: 'long', skin: pick(SKIN.slice(0, 6)), stripes: null });
     c.steps = ['steth'];
     c.params.steth = { variant: 'trench' };
-    c.complaint = 'Hello. I am one normal adult human. I would like one normal checkup. And possibly a lollipop.';
+    c.complaint = line('trench', ['Hello. I am one normal adult human. I would like one normal checkup. And possibly a lollipop.', 'Greetings, doctor. I am a tall, regular grown-up. Please check my heart. Heart. Just the one.', 'I am here for an adult checkup. I drove here in my adult car. I have a job. At the office. Of adults.'], used);
     c.remarks = ['I pay my taxes. Like adults do.', 'My favorite food is coffee. Adult coffee.', 'Please do not look directly under the coat.'];
     c.success = 'Thank you, fellow adult. We— I— will be going now.';
     return c;
   },
-  mime() {
+  mime(used) {
     const gender = pick(['m', 'f']);
     const c = baseCase('adult', gender);
     Object.assign(c, { first: 'Marcel', name: gender === 'm' ? 'Marcel the Mime' : 'Mimi the Mime', ageLabel: '???', voice: 0, personality: 'mime' });
     Object.assign(c.look, { skin: '#f7f7f7', stripes: ['#111111', '#ffffff'], outfit: 'mime', pants: '#111111', glasses: false, beard: null, sleeves: 'long' });
     c.steps = [pick(['shot', 'reflex'])];
-    c.complaint = c.steps[0] === 'shot' ? '(Mimes a giant needle. Then mimes fainting. Then mimes being fine.)' : '(Mimes kicking a ball. Mimes a tiny hammer. Taps knee. Points at you.)';
+    c.complaint = c.steps[0] === 'shot'
+      ? line('mime', ['(Mimes a giant needle. Then mimes fainting. Then mimes being fine.)', '(Pretends to roll up a sleeve. Points at arm. Covers eyes.)'], used)
+      : line('mime', ['(Mimes kicking a ball. Mimes a tiny hammer. Taps knee. Points at you.)', '(Mimes a knee that will not bend. Then a knee that bends way too much.)'], used);
     c.remarks = ['(Mimes being trapped in an invisible box.)', '(Mimes crying. Silently. Very dramatic.)', '(Gives you a big thumbs up. Then a smaller, worried thumbs up.)', '(Mimes calling a lawyer.)'];
     c.success = '(Mimes a standing ovation. Bows to nobody.)';
     c.fail = '(Mimes writing a VERY long angry letter.)';
     return c;
   },
-  influencer() {
+  influencer(used) {
     const gender = pick(['m', 'f']);
     const c = baseCase('teen', gender);
     Object.assign(c, { first: gender === 'm' ? 'Brayden' : 'Madison', name: gender === 'm' ? 'Brayden Clout' : 'Madison Glow', personality: 'influencer' });
     c.look.outfit = 'influencer'; c.look.glasses = false;
     c.steps = ['cast'];
-    c.complaint = 'I broke my arm doing a challenge for my channel. Can you make the cast, like, aesthetic? For content?';
-    c.remarks = ["Wait, do that again, I wasn't recording.", 'Say hi to my followers! All twelve of them!', "This is going to get SO many likes. Like, at least four."];
+    c.complaint = line('influencer', ['I broke my arm doing a challenge for my channel. Can you make the cast, like, aesthetic? For content?', 'I fell off a fountain while filming an unboxing. The box is fine. Make the cast cute, please.', 'Broke my arm doing a dance trend. I was SO close to going viral. Okay, I went viral. For falling.'], used);
+    c.remarks = ["Wait, do that again, I wasn't recording.", 'Say hi to my followers! All twelve of them!', 'This is going to get SO many likes. Like, at least four.'];
     c.success = 'OMG. This cast is going to break the internet. Unlike my arm. Which is already broken.';
     return c;
   },
-  grandma() {
+  grandma(used) {
     const c = baseCase('elder', 'f');
     Object.assign(c, { first: 'Bertha', name: 'Grandma Bertha Butterfield', age: 88, ageLabel: '88', personality: 'grandma' });
     c.look.hair = { style: 'bun', color: '#f5f5f5' }; c.look.glasses = true;
     c.steps = ['shot'];
-    c.complaint = "Give me the shot, sonny. I've survived two hip replacements and a 1987 perm. Do your worst.";
+    c.complaint = line('grandma', ["Give me the shot, sonny. I've survived two hip replacements and a 1987 perm. Do your worst.", "Flu shot. Make it snappy, I've got bingo and a grudge match after.", "I'm here for my booster. I've been getting shots since before shots were cool."], used);
     c.remarks = ["Is that the needle? I've knitted with bigger.", 'Hurry up, my show starts at four.', 'You remind me of my grandson. He also wiggles too much.'];
     c.success = "Ha! Didn't even flinch. Here, have a hard candy. It's from 2003.";
     return c;
   },
-  ticklish() {
+  ticklish(used) {
     const gender = pick(['m', 'f']);
     const ag = pick(['adult', 'teen', 'adult']);
-    const c = normalPatient(ag, gender, 'steth');
+    const c = baseCase(ag, gender);
+    c.steps = ['steth'];
     c.params.steth = { variant: 'ticklish' };
     c.personality = 'ticklish';
-    c.complaint = "Just a checkup! Fair warning... I am EXTREMELY ticklish. Like, dangerously.";
+    c.complaint = line('ticklish', ['Just a checkup! Fair warning... I am EXTREMELY ticklish. Like, dangerously.', 'Heart checkup, please. Be gentle. A feather once made me laugh for an hour.', 'Checkup! Quick warning: if you tickle me, I am not responsible for what my arms do.'], used);
     c.remarks = ['Hehe— no— HAHA— stop—', "Don't you DARE wiggle that thing.", 'I once laughed so hard I fell off a boat.'];
     return c;
   },
-  conspiracy() {
+  conspiracy(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Kevin', name: 'Kevin Truthseeker', personality: 'conspiracy' });
     c.look.glasses = true;
@@ -285,14 +255,18 @@ const PERSONALITIES = {
     return c;
   },
 };
+export const PERSONA_NAMES = Object.keys(PERSONALITIES);
 
-function specialPatient(type, ageGroup, gender) {
+export const SPECIAL_TYPES = ['runner', 'baby', 'sneezy', 'hider', 'scooter', 'germs', 'triplets', 'lightsout'];
+
+function specialPatient(type, ageGroup, gender, used) {
+  const ag = ageGroup;
   if (type === 'runner') {
-    const c = baseCase(ageGroup, gender);
+    const c = baseCase(ag === 'elder' ? 'adult' : ag, gender);
     c.special = 'runner';
-    c.steps = [pick(['shot', 'shot', 'blood'])];
-    c.complaint = c.steps[0] === 'shot' ? "I'm here for a shot. I'm totally fine with needles. Totally. Completely. 100%." : "Blood test! Love those. No problem. Needles don't scare me AT ALL.";
-    c.remarks = REMARKS[ageGroup];
+    c.steps = ['shot'];
+    c.complaint = pickExcuse('runner', c.ageGroup, used);
+    c.remarks = REMARKS[c.ageGroup];
     c.success = 'Okay. Okay. Sorry about the running. And the screaming.';
     return c;
   }
@@ -300,18 +274,60 @@ function specialPatient(type, ageGroup, gender) {
     const c = baseCase('kid', gender);
     c.special = 'hider';
     c.steps = ['shot'];
-    c.complaint = "I need a shot? ...Hey, what's that behind you?";
+    c.complaint = pickExcuse('hider', 'kid', used);
     c.remarks = REMARKS.kid;
-    c.success = "Hide and seek AND a shot? Best day ever. Well... second best.";
+    c.success = 'Hide and seek AND a shot? Best day ever. Well... second best.';
     return c;
   }
   if (type === 'sneezy') {
-    const c = baseCase(ageGroup, gender);
+    const c = baseCase(ag, gender);
     c.special = 'sneezy';
     c.steps = ['shot'];
-    c.complaint = "I need my allergy shot. I'm allergic to pollen, dust, cats, and... ah... AH... hospitals.";
+    c.complaint = pickExcuse('sneezy', ag, used);
     c.remarks = ["Sorry! It's the pollen! Or... you? Is it you?", 'That one had my name on it. Sorry.', "It's not contagious! Probably!"];
     c.success = 'I can breathe! Through my NOSE! What a time to be alive.';
+    return c;
+  }
+  if (type === 'scooter') {
+    const c = baseCase(Math.random() < 0.7 ? 'elder' : 'adult', gender);
+    c.special = 'scooter';
+    c.steps = ['shot'];
+    c.complaint = pickExcuse('scooter', c.ageGroup, used);
+    c.remarks = REMARKS[c.ageGroup];
+    c.success = 'Fine. You win. But my scooter gets a lollipop too.';
+    return c;
+  }
+  if (type === 'germs') {
+    const c = baseCase(ag, gender);
+    c.special = 'germs';
+    c.steps = ['shot'];
+    c.complaint = pickExcuse('germs', ag, used);
+    c.remarks = ['*cough* Sorry. *COUGH*', 'Is it hot in here or is that just me? It is me. I have a fever.', 'My germs say hi. Do not say hi back.'];
+    c.success = 'I feel AMAZING. Those germs did not know who they were messing with.';
+    return c;
+  }
+  if (type === 'triplets') {
+    const c = baseCase('kid', gender);
+    const last = c.name.split(' ')[1];
+    const names = shuffle(gender === 'm' ? ['Leo', 'Max', 'Sam', 'Finn', 'Kai', 'Noah'] : ['Mia', 'Ivy', 'Ruby', 'Luna', 'Nora', 'Ella']).slice(0, 3);
+    c.special = 'triplets';
+    c.triplets = names;
+    c.first = names[0];
+    c.name = `The ${last} Triplets`;
+    c.ageLabel = `${c.age} (all three)`;
+    c.steps = ['shot'];
+    c.complaint = pickExcuse('triplets', 'kid', used);
+    c.remarks = REMARKS.kid;
+    c.success = 'Okay, you got us. Can the other two still have lollipops?';
+    return c;
+  }
+  if (type === 'lightsout') {
+    const c = baseCase(ag === 'elder' ? 'teen' : ag, gender);
+    c.special = 'lightsout';
+    c.steps = ['shot'];
+    c.complaint = pickExcuse('lightsout', c.ageGroup, used);
+    c.remarks = ['Boo. ...Too early?', 'I would never prank a doctor. Twice.', 'Is it just me, or are the lights flickering?'];
+    c.success = 'Best. Prank. Ever. Also, thanks for the shot, I guess.';
     return c;
   }
   if (type === 'baby') {
@@ -328,7 +344,7 @@ function specialPatient(type, ageGroup, gender) {
     c.baby = { skin: c.look.skin, shirt: pick(['#ffd6e0', '#bde0fe', '#caffbf', '#fdffb6', '#ffc6ff']), hair: Math.random() < 0.5 ? { style: 'bonnet', color: pick(['#ffffff', '#ffd6e0', '#bde0fe']) } : { style: 'curl', color: c.look.hair.color } };
     c.steps = ['babyshot'];
     const pr = babyG === 'm' ? 'He' : 'She';
-    c.complaint = pick([`${pr} needs ${babyG === 'm' ? 'his' : 'her'} vaccine. Fair warning: ${pr.toLowerCase()} bit the last doctor.`, `${pr}'s due for shots. ${pr} only stops crying for the vacuum cleaner.`, `Vaccine day! ${pr}'s teething. And plotting something.`]);
+    c.complaint = pickExcuse('baby', 'adult', used, { Pr: pr, pr: pr.toLowerCase(), his: babyG === 'm' ? 'his' : 'her' });
     c.parentRemarks = [`${pr} gets the crying from ${parentGender === 'm' ? 'me' : (babyG === 'm' ? 'his' : 'her') + ' dad'}.`, 'Try the silly face! No, the OTHER silly face.', 'Do you have kids? You will find out.', `Last week ${pr.toLowerCase()} cried for an hour because a banana broke.`];
     c.success = `${babyName} didn't even notice! You're a wizard. A medical wizard.`;
     c.voice = 1.9;
@@ -337,46 +353,39 @@ function specialPatient(type, ageGroup, gender) {
   return null;
 }
 
-export const personaPatient = name => (PERSONALITIES[name] ? PERSONALITIES[name]() : null);
+export const personaPatient = (name, used = new Set()) => (PERSONALITIES[name] ? PERSONALITIES[name](used) : null);
+export const testSpecialPatient = (type, used = new Set()) => specialPatient(type, pick(['kid', 'teen', 'adult', 'elder']), pick(['m', 'f']), used);
 
 // ---------- day generation ----------
 const ALL_STEPS = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'cast'];
 
-export function generateDay(day) {
+// opts.used: Set of excuses already said (saved between days and updated here)
+// opts.special: which special mini-game patient comes today (or null)
+// opts.persona: which funny character visits today (or null)
+export function generateDay(day, opts = {}) {
+  const used = opts.used || new Set();
   const ages = shuffle(['kid', 'adult', pick(['teen', 'elder']), pick(['kid', 'adult', 'elder']), pick(['adult', 'teen', 'kid'])]);
-  let genders = shuffle(['m', 'f', 'm', 'f', pick(['m', 'f'])]);
-  const specialsPool = ['runner', 'baby', 'sneezy', 'hider'];
-  let specials;
-  if (day === 1) specials = ['runner'];
-  else if (day === 2) specials = shuffle(['baby', 'hider', 'sneezy']).slice(0, 2);
-  else specials = shuffle(specialsPool).slice(0, day >= 4 ? (Math.random() < 0.5 ? 3 : 2) : 2);
-  const personas = shuffle(Object.keys(PERSONALITIES));
-  const nPersona = day === 1 ? 1 : (Math.random() < 0.5 ? 2 : 1);
+  const genders = shuffle(['m', 'f', 'm', 'f', pick(['m', 'f'])]);
+  const slots = [null, null, null, null, null];
+  const free = shuffle([1, 2, 3, 4]);
+  if (opts.special) slots[free.pop()] = { type: 'special', s: opts.special };
+  if (opts.persona) slots[free.pop()] = { type: 'persona', p: opts.persona };
   const steps = shuffle(ALL_STEPS);
-  const slots = [];
-  for (let i = 0; i < 5; i++) slots.push(null);
-  // place specials in the middle-ish, personalities elsewhere
-  const order = day === 1 ? [2, 4, 1, 3, 0] : shuffle([1, 2, 3, 4, 0]);
-  let oi = 0;
-  for (const s of specials) slots[order[oi++]] = { type: 'special', s };
-  for (let k = 0; k < nPersona && oi < 5; k++) slots[order[oi++]] = { type: 'persona', p: personas[k] };
-  // day 1: first patient is always a plain one
-  if (day === 1 && slots[0]) { const t = slots[0]; slots[0] = null; const free = slots.findIndex((x, i) => i > 0 && !x); if (free >= 0) slots[free] = t; }
   const out = [];
   let si = 0;
   for (let i = 0; i < 5; i++) {
     const slot = slots[i];
     const ag = ages[i], g = genders[i];
     let c;
-    if (slot && slot.type === 'special') c = specialPatient(slot.s, ag === 'elder' && slot.s === 'runner' ? 'adult' : ag, g);
-    else if (slot && slot.type === 'persona') c = PERSONALITIES[slot.p]();
+    if (slot && slot.type === 'special') c = specialPatient(slot.s, ag, g, used);
+    else if (slot && slot.type === 'persona') c = PERSONALITIES[slot.p](used);
     else {
       let st = steps[si++ % steps.length];
       if (day === 1 && i === 0) st = pick(['removal', 'shot', 'cast']);
-      c = normalPatient(ag, g, st);
+      c = normalPatient(ag, g, st, used);
       if (day >= 3 && Math.random() < 0.3) {
         const extra = pick(ALL_STEPS.filter(x => x !== st && x !== 'surgery'));
-        const more = addStep(c, extra);
+        const more = addStep(c, extra, used);
         c.complaint += ' ' + more.replace(/^I /, 'Also, I ').replace(/^My /, 'Also, my ');
       }
     }

@@ -12,7 +12,7 @@ export async function armSetup(G, P, side = 'R', focus = 'upper') {
   const s = person.s;
   let center, w;
   if (focus === 'upper') { center = a.shoulder.clone().lerp(a.wrist, 0.33); w = 0.62 * s; }
-  else { center = a.elbow.clone().lerp(a.wrist, 0.35); w = 0.5 * s; }
+  else { center = a.elbow.clone().lerp(a.hand, 0.45); w = 0.62 * s; }
   center.y += 0.02 * s;
   await E.frame(center, w, w * 0.62, new THREE.Vector3(0, 0.22, 1), 0.8);
   return a;

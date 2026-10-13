@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { createEngine, clamp, rand, pick, TABLE_TOP } from './engine.js';
+import { createEngine, clamp, rand, pick, shuffle, TABLE_TOP } from './engine.js';
 import { buildRoom } from './room.js';
 import { Person, Baby } from './person.js';
 import { createUI, h } from './ui.js';
 import { sfx, music } from './audio.js';
 import * as D from './data.js';
 import { clipboard } from './props.js';
+import { route, SPOTS } from './nav.js';
 import * as removal from './games/removal.js';
 import * as shot from './games/shot.js';
 import * as blood from './games/blood.js';
@@ -17,13 +18,17 @@ import * as chase from './games/chase.js';
 import * as baby from './games/baby.js';
 import * as sneeze from './games/sneeze.js';
 import * as hide from './games/hide.js';
+import * as scooter from './games/scooter.js';
+import * as germs from './games/germs.js';
+import * as triplets from './games/triplets.js';
+import * as lightsout from './games/lightsout.js';
 
 const GAMES = { removal, shot, blood, surgery, reflex, steth, cast, babyshot: baby };
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // ---------------- save ----------------
 const SAVE_KEY = 'doctor-chaos-save-v1';
-const fresh = () => ({ v: 1, day: 1, money: 200, upgrades: { steady: 0, lawyer: 0, shoes: 0, lolli: 0, coats: 0 }, coat: '#ffffff', tutorialDone: false, seen: [], muted: false, stats: { patients: 0, threeStars: 0, lawsuits: 0, paidOut: 0, bestDay: 0 } });
+const fresh = () => ({ v: 1, day: 1, money: 200, upgrades: { steady: 0, lawyer: 0, shoes: 0, lolli: 0, coats: 0 }, coat: '#ffffff', tutorialDone: false, seen: [], muted: false, usedExcuses: [], nextSpecialDay: null, specialBag: [], personaBag: [], lastSpecial: null, plan: null, stats: { patients: 0, threeStars: 0, lawsuits: 0, paidOut: 0, bestDay: 0 } });
 function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.v === 1) return { ...fresh(), ...s, upgrades: { ...fresh().upgrades, ...s.upgrades }, stats: { ...fresh().stats, ...s.stats } }; } catch (e) { /* ignore */ } return null; }
 let state = loadSave() || fresh();
 const hadSave = !!loadSave();
@@ -81,35 +86,58 @@ const G = {
   },
 };
 window.__G = G;
+window.__D = D;
 window.__state = () => state;
 
 // ---------------- helpers ----------------
 function disposeObj(o) { o.traverse(x => { if (x.geometry) x.geometry.dispose(); }); }
 const fmt = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString();
 
+function walkRoute(person, to, speed = 1.5, run = false) {
+  const p = person.root.position;
+  return person.walkPath(E, route({ x: p.x, z: p.z }, to), speed, run);
+}
+
 async function enterPatient(P) {
   const { person, parent } = P;
   await E.home(0.6);
   sfx.door();
   await R.openDoor(E, true);
-  if (parent) {
-    parent.placeStanding(R.door.x, -2.5, 0);
-    parent.setPose('stand', true);
-    await parent.walkTo(E, R.door.x - 0.2, -1.3, 1.6);
-    await parent.walkTo(E, 0.95, 0.65, 1.6);
-    await parent.faceTo(E, Math.atan2(-0.95, -0.4), 0.3);
+  if (P.extras && P.extras.length) {
+    const kids = [P.extras[0], person, P.extras[1]];
+    const xs = [-0.62, 0, 0.62];
+    const goIn = async (kid, i) => {
+      await E.wait(i * 0.55);
+      kid.placeStanding(SPOTS.door.x, SPOTS.door.z, 0);
+      kid.setPose('stand', true);
+      kid.root.visible = true;
+      await kid.walkPath(E, [SPOTS.doorIn], 1.6);
+      await walkRoute(kid, { x: xs[i], z: 1.0 + (i === 1 ? 0.12 : 0) }, 1.6);
+      await kid.hopOnTable(E, xs[i]);
+    };
+    const all = Promise.all(kids.map(goIn));
+    await E.wait(2.4);
     R.openDoor(E, false); sfx.door();
+    await all;
+    return;
+  }
+  const walker = parent || person;
+  walker.placeStanding(SPOTS.door.x, SPOTS.door.z, 0);
+  walker.setPose('stand', true);
+  walker.root.visible = true;
+  await walker.walkPath(E, [SPOTS.doorIn], 1.5);
+  const closing = R.openDoor(E, false); sfx.door();
+  if (parent) {
+    await walkRoute(parent, SPOTS.parent, 1.5);
+    await parent.faceTo(E, Math.atan2(-SPOTS.parent.x, 0.25 - SPOTS.parent.z), 0.35);
+    await closing;
     person.placeSitting();
     person.root.scale.setScalar(0.01); person.root.visible = true;
     sfx.pop();
     await E.tween(0.3, k => person.root.scale.setScalar(Math.max(0.01, k)));
   } else {
-    person.placeStanding(R.door.x, -2.5, 0);
-    person.setPose('stand', true);
-    await person.walkTo(E, R.door.x - 0.2, -1.3, 1.5);
-    R.openDoor(E, false); sfx.door();
-    await person.walkTo(E, 0.05, 0.95, 1.5);
-    await person.faceTo(E, Math.PI, 0.2);
+    await walkRoute(person, SPOTS.front, 1.5);
+    await closing;
     await person.hopOnTable(E);
   }
 }
@@ -122,14 +150,14 @@ async function exitPatient(P) {
     await E.tween(0.25, k => person.root.scale.setScalar(Math.max(0.01, 1 - k)));
     person.root.visible = false;
     sfx.door(); R.openDoor(E, true);
-    await parent.walkTo(E, R.door.x - 0.2, -1.3, 1.8);
-    await parent.walkTo(E, R.door.x, -2.9, 1.8);
+    await walkRoute(parent, SPOTS.doorIn, 1.7);
+    await parent.walkPath(E, [SPOTS.door], 1.7);
     parent.root.visible = false;
   } else if (person.root.visible) {
-    await person.hopOff(E, 0.45, 0.95);
+    await person.hopOff(E, SPOTS.front.x, SPOTS.front.z);
     sfx.door(); R.openDoor(E, true);
-    await person.walkTo(E, R.door.x - 0.2, -1.3, 1.7);
-    await person.walkTo(E, R.door.x, -2.9, 1.7);
+    await walkRoute(person, SPOTS.doorIn, 1.7);
+    await person.walkPath(E, [SPOTS.door], 1.7);
     person.root.visible = false;
   }
   await R.openDoor(E, false);
@@ -140,10 +168,10 @@ async function runnerSequence(P) {
   person.expr('scared'); person.setPose('scared'); person.wiggle = 0.8;
   sfx.ouch(c.voice);
   await G.say(pick(['Is that a NEEDLE?! NOPE. NOPE NOPE NOPE!', 'Oh no. Oh no no no no. BYE!', "Actually I just remembered I'm late for... ANYTHING ELSE!"]), { key: 'c', hold: 0.3 });
-  await person.hopOff(E, 0.6, 0.9);
+  await person.hopOff(E, SPOTS.front.x, SPOTS.front.z);
   sfx.door(); R.openDoor(E, true);
-  await person.walkTo(E, R.door.x - 0.2, -1.4, 4.2, true);
-  await person.walkTo(E, R.door.x, -2.9, 4.2, true);
+  await walkRoute(person, SPOTS.doorIn, 4.2, true);
+  await person.walkPath(E, [SPOTS.door], 4.2, true);
   person.root.visible = false;
   R.openDoor(E, false);
   nurseSay('Well don\'t just stand there, Doctor. GET THEM!', { hold: 0.6 });
@@ -162,6 +190,71 @@ async function runnerSequence(P) {
   return r;
 }
 
+async function scooterSequence(P) {
+  const { person, c } = P;
+  person.expr('scared'); person.setPose('scared'); person.wiggle = 0.6;
+  await G.say(pick(["A needle?! Not today! To the SCOOTER!", 'Nope! Time to ride!', "I didn't buy a scooter to sit around getting SHOTS!"]), { key: 'c', hold: 0.3 });
+  await person.hopOff(E, SPOTS.front.x, SPOTS.front.z);
+  sfx.door(); R.openDoor(E, true);
+  await walkRoute(person, SPOTS.doorIn, 3.2, true);
+  await person.walkPath(E, [SPOTS.door], 3.2, true);
+  person.root.visible = false;
+  R.openDoor(E, false);
+  sfx.whoosh();
+  nurseSay('Did they just steal a SCOOTER? Grab a wheelchair, Doctor!', { hold: 0.6 });
+  await E.wait(1.0);
+  ui.flash('rgba(255,255,255,0.9)');
+  const r = await scooter.play(G, P);
+  ui.clearBubbles();
+  await E.home(0);
+  if (r.caught) {
+    person.root.visible = true;
+    person.placeSitting(); person.setPose('sit', true); person.expr('sad');
+    await G.say(pick(['Fine. FINE. But the scooter was worth it.', 'Okay, you win. That was the most fun I have had in years, though.', 'Do NOT tell my grandkids about this.']), { key: 'c', hold: 0.6 });
+  } else {
+    await nursePanel('They got away on the scooter. The lobby wants it back. And they are suing us. For letting them escape. Somehow.', { button: 'Ugh' });
+  }
+  return r;
+}
+
+async function germsSequence(P) {
+  const { person } = P;
+  person.expr('sad'); sfx.sneeze();
+  await G.say(pick(['*COUGH* *COUGH* Sorry. My germs are very loud today.', 'Ah... AH... CHOO! Oops. That one had friends in it.']), { key: 'c', hold: 0.4 });
+  await nursePanel("Those germs are too tough for a regular shot. Hop in the <b>Micro-Sub</b>. We'll shrink you down so you can blast them first!", { button: 'Shrink me!' });
+  ui.flash('rgba(127,219,255,0.9)'); sfx.whoosh();
+  const r = await germs.play(G, P);
+  ui.clearBubbles();
+  await E.home(0);
+  ui.flash('rgba(127,219,255,0.6)');
+  person.expr('happy');
+  await G.say(r.boss ? 'Whoa. I feel like a whole new nose.' : 'I feel a little better. The germs are hiding, though.', { key: 'c', hold: 0.6 });
+  await nursePanel('Great. Now give them the shot to finish the job.', { button: 'On it' });
+  return r;
+}
+
+async function lightsOutSequence(P) {
+  const { person } = P;
+  person.expr('smug');
+  await G.say(pick(["Hey, doc... what's that behind you?", 'Hehehe. Get ready.', 'Oh no, I hope nobody flips that switch. *flips switch*']), { key: 'c', hold: 0.3 });
+  const h0 = R.hemi.intensity, s0 = R.sun.intensity;
+  sfx.crack();
+  for (let i = 0; i < 3; i++) { R.hemi.intensity = 0.05; R.sun.intensity = 0; await E.wait(0.12); R.hemi.intensity = h0; R.sun.intensity = s0; await E.wait(0.1); }
+  R.hemi.intensity = 0.04; R.sun.intensity = 0;
+  person.root.visible = false;
+  nurseSay("AAH! Who turned off the lights?! Doctor, take this flashlight!", { hold: 0.6 });
+  await E.wait(1.2);
+  const r = await lightsout.play(G, P);
+  ui.clearBubbles();
+  R.hemi.intensity = h0; R.sun.intensity = s0;
+  await E.home(0);
+  person.root.visible = true;
+  person.placeSitting(); person.setPose('sit', true);
+  person.expr('laugh');
+  await G.say(r.found ? 'Best. Prank. EVER. Okay, okay, I will get my shot.' : 'You never found me! Hehe. I got bored and came back. Shot time, I guess.', { key: 'c', hold: 0.6 });
+  return r;
+}
+
 function lawsuitAmount(sev) {
   const base = sev >= 3 ? rand(900, 1600) : sev === 2 ? rand(350, 650) : rand(120, 230);
   const raw = base * (1 + (state.day - 1) * 0.08);
@@ -175,13 +268,19 @@ async function runPatient(c, idx, total, hooks = {}) {
   let person, parent = null;
   if (c.special === 'baby') {
     parent = new Person(c.parent.look);
+    parent.root.visible = false;
     E.scene.add(parent.root);
     person = new Baby(c.baby);
     person.root.visible = false;
-  } else person = new Person(c.look);
+  } else { person = new Person(c.look); person.root.visible = false; }
   E.scene.add(person.root);
-  const offU = E.onUpdate((dt, t) => { person.update(dt, t); if (parent) parent.update(dt, t); });
-  const P = { person, parent, c, mood: 70 + 5 * (state.upgrades.lolli || 0) };
+  const extras = [];
+  if (c.special === 'triplets') {
+    for (let k = 0; k < 2; k++) { const tw = new Person(JSON.parse(JSON.stringify(c.look))); tw.root.visible = false; E.scene.add(tw.root); extras.push(tw); }
+  }
+  const actors = [person, ...extras, ...(parent ? [parent] : [])];
+  const offU = E.onUpdate((dt, t) => { for (const a of actors) a.update(dt, t); });
+  const P = { person, parent, extras, c, mood: 70 + 5 * (state.upgrades.lolli || 0) };
   G.cur = P;
   await enterPatient(P);
   const showNote = G.tutorial || state.day <= 2;
@@ -223,6 +322,17 @@ async function runPatient(c, idx, total, hooks = {}) {
       extra = await hide.play(G, P);
     }
     if (c.special === 'sneezy' && !extra) extra = await sneeze.play(G, P);
+    if (c.special === 'scooter' && !extra) {
+      extra = await scooterSequence(P);
+      if (!extra.caught) { results.push({ score: 0, fail: true, severity: 1, reason: 'scooter', step }); break; }
+    }
+    if (c.special === 'germs' && !extra) extra = await germsSequence(P);
+    if (c.special === 'lightsout' && !extra) extra = await lightsOutSequence(P);
+    if (c.special === 'triplets' && !extra) {
+      extra = await triplets.play(G, P);
+      person = P.person;
+      if (extra.fail) { results.push({ ...extra, step }); break; }
+    }
     let res;
     try {
       res = await GAMES[step].play(G, P, c.params[step] || {});
@@ -248,6 +358,7 @@ async function runPatient(c, idx, total, hooks = {}) {
   let pay = fail ? 0 : Math.round(c.basePay * [0, 0.55, 0.8, 1][stars]);
   const tip = !fail && stars === 3 && P.mood > 55 ? Math.round(c.basePay * (0.15 + 0.05 * (state.upgrades.lolli || 0))) : 0;
   const escaped = extra && extra.caught === false;
+  person = P.person;
   // reaction
   if (!escaped) {
     if (fail) { person.expr(c.special === 'baby' ? 'cry' : 'angry'); if (c.special === 'baby') await ui.say(() => parent.headTop(), pick(['My lawyer will be calling.', 'We are LEAVING.']), { name: c.parent.title, key: 'parent', hold: 1 }); else await G.say(c.fail || pick(D.FAIL), { key: 'c', hold: 0.8 }); }
@@ -291,8 +402,7 @@ async function runPatient(c, idx, total, hooks = {}) {
   if (stars === 3) state.stats.threeStars++;
   if (!escaped) await exitPatient(P);
   offU();
-  E.scene.remove(person.root); disposeObj(person.root);
-  if (parent) { E.scene.remove(parent.root); disposeObj(parent.root); }
+  for (const a of actors) { E.scene.remove(a.root); disposeObj(a.root); }
   G.cur = null;
   return { c, stars, pay: earned, lawsuit, review, fail };
 }
@@ -325,13 +435,42 @@ async function runTutorial() {
 }
 
 // ---------------- day ----------------
+// Special mini-game patients show up about every other day, on a random schedule.
+function planDay(day) {
+  if (state.plan && state.plan.day === day) return state.plan;
+  if (state.nextSpecialDay == null) state.nextSpecialDay = day + pick([0, 1]);
+  let special = null;
+  if (day >= state.nextSpecialDay) {
+    if (!state.specialBag || !state.specialBag.length) {
+      let bag = shuffle(D.SPECIAL_TYPES);
+      if (bag[0] === state.lastSpecial) bag.push(bag.shift());
+      state.specialBag = bag;
+    }
+    special = state.specialBag.shift();
+    state.lastSpecial = special;
+    state.nextSpecialDay = day + pick([1, 2, 2, 2, 3, 3]);
+  }
+  let persona = null;
+  if (Math.random() < 0.55) {
+    if (!state.personaBag || !state.personaBag.length) state.personaBag = shuffle(D.PERSONA_NAMES);
+    persona = state.personaBag.shift();
+  }
+  state.plan = { day, special, persona };
+  return state.plan;
+}
+
+window.__planDay = d => planDay(d);
+
 async function playDay() {
   G.tutorial = false;
   const day = state.day;
   ui.showHUD(true);
   ui.setHUD({ day, money: state.money, patient: '' });
+  const plan = planDay(day);
+  const used = new Set(state.usedExcuses || []);
+  const list = D.generateDay(day, { used, special: plan.special, persona: plan.persona });
+  state.usedExcuses = [...used];
   writeSave();
-  const list = D.generateDay(day);
   await E.home(0.6);
   await ui.card({
     icon: '🏥',
@@ -514,6 +653,7 @@ if (test) {
     ui.loadSeen(state.seen);
     const step = test;
     let c = step.startsWith('p-') ? D.personaPatient(step.slice(2)) : null;
+    if (!c && D.SPECIAL_TYPES.includes(step)) c = D.testSpecialPatient(step);
     if (!c && ['runner', 'baby', 'sneezy', 'hider'].includes(step)) c = D.generateDay(3).find(x => x.special === step) || null;
     if (!c && ['runner', 'baby', 'sneezy', 'hider'].includes(step)) {
       for (let k = 0; k < 40 && !c; k++) c = D.generateDay(4).find(x => x.special === step);

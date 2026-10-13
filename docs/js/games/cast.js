@@ -60,10 +60,16 @@ export async function play(G, P) {
   G.say(pick(['Is it supposed to bend like that?', 'My arm has a new elbow. I did not order a new elbow.', 'Be gentle. Please. Pretty please.']), { key: 'c', hold: 1 });
   let cur = crook, grabbed = false, setMiss = 0, cd = 0, lastAng = crook, holdOk = 0;
   Object.assign(G.dbg, { phase: 'set', hand: () => person.wp(person.j.elR, 0, -0.26, 0), elbow: elbowW, baseAng, sign, s, cur: () => cur });
+  // Angles are measured on screen, so "lined up with the ghost arm" is exactly what the player sees.
+  const straightTip = a0.elbow.clone().addScaledVector(straightDir, 0.22 * s);
+  const screenAng = (fromW, x, y) => { const f = E.toScreen(fromW); return Math.atan2(-(y - f.y), x - f.x); };
+  const wrapA = v => { while (v > Math.PI) v -= Math.PI * 2; while (v < -Math.PI) v += Math.PI * 2; return v; };
+  const baseS = () => { const t2 = E.toScreen(straightTip); return screenAng(elbowW, t2.x, t2.y); };
+  const crookS = (() => { const c2 = E.toScreen(crookedW); return wrapA(screenAng(elbowW, c2.x, c2.y) - baseS()); })();
+  const signS = Math.sign(crookS) || 1;
   S.on('down', () => {
-    const p = E.pointerOnPlane(plane); if (!p) return;
-    const hw = person.wp(person.j.elR, 0, -0.26, 0);
-    if (Math.hypot(p.x - hw.x, p.y - hw.y) < 0.11 * s) { grabbed = true; sfx.pop(); }
+    const hs = E.toScreen(person.wp(person.j.elR, 0, -0.26, 0));
+    if (Math.hypot(E.input.cx - hs.x, E.input.cy - hs.y) < 70) { grabbed = true; sfx.pop(); lastAng = cur; }
   });
   S.on('up', () => { grabbed = false; });
   await new Promise(res => {
@@ -73,26 +79,23 @@ export async function play(G, P) {
       handRing.scale.setScalar(1 + Math.sin(t * 7) * 0.08);
       cd -= dt;
       if (grabbed) {
-        const p = E.pointerOnPlane(plane);
-        if (p) {
-          let ang = Math.atan2(p.y - elbowW.y, p.x - elbowW.x) - baseAng;
-          while (ang > Math.PI) ang -= Math.PI * 2; while (ang < -Math.PI) ang += Math.PI * 2;
-          const want = clamp(ang * sign, -0.15, crook + 0.3);
-          const maxStep = dt * 1.1;
-          const next = cur + clamp(want - cur, -maxStep, maxStep);
-          const speed = Math.abs(want - lastAng) / dt;
-          lastAng = want;
-          if (speed > 4.2 - diff && cd <= 0 && Math.abs(want - cur) > 0.05) {
-            cd = 1.0; setMiss++; G.mood(-10);
-            sfx.ouch(P.c.voice || 1); ui.flash(); person.expr('ouch'); person.wiggle = 0.5;
-            G.say(pick(AAH), { key: 'ouch', hold: 0.8 });
-            setTimeout(() => person.expr('sad'), 700);
-          }
-          cur = next;
+        const ang = wrapA(screenAng(elbowW, E.input.cx, E.input.cy) - baseS());
+        const want = clamp(ang * signS, -0.04, crook + 0.3);
+        const maxStep = dt * 1.1;
+        const next = cur + clamp(want - cur, -maxStep, maxStep);
+        const speed = Math.abs(want - lastAng) / dt;
+        lastAng = want;
+        if (speed > 4.2 - diff && cd <= 0 && Math.abs(want - cur) > 0.05) {
+          cd = 1.0; setMiss++; G.mood(-10);
+          sfx.ouch(P.c.voice || 1); ui.flash(); person.expr('ouch'); person.wiggle = 0.5;
+          G.say(pick(AAH), { key: 'ouch', hold: 0.8 });
+          setTimeout(() => person.expr('sad'), 700);
         }
+        cur = next;
       }
       person.off.elR = [0, 0, cur];
-      if (Math.abs(cur) < 0.06) { holdOk += dt; if (holdOk > 0.15) { off(); res(); } } else holdOk = 0;
+      // close enough to straight (about 7 degrees) clicks into place
+      if (Math.abs(cur) < 0.12) { holdOk += dt; if (holdOk > 0.12 || !grabbed) { off(); res(); } } else holdOk = 0;
     });
   });
   person.off.elR = [0, 0, 0]; grabbed = false;
