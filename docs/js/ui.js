@@ -79,7 +79,7 @@ export function createUI(root, E) {
       const x = Math.max(bw / 2 + 8, Math.min(W - bw / 2 - 8, p.x));
       const y = Math.max(b.el.offsetHeight + 60, p.y);
       b.el.style.transform = `translate(${x - bw / 2}px, ${y - b.el.offsetHeight}px)`;
-      b.el.style.setProperty('--tail', `${Math.max(14, Math.min(bw - 14, p.x - (x - bw / 2)))}px`);
+      b.el.style.setProperty('--tail', `${Math.max(24, Math.min(bw - 24, p.x - (x - bw / 2)))}px`);
     }
   });
   ui.say = (anchor, text, o = {}) => {

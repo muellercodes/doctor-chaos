@@ -61,12 +61,15 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd9d2; fon
 /* ---------- bubbles ---------- */
 .bubbles { inset: 0; z-index: 6; }
 .bubble { position: absolute; left: 0; top: 0; max-width: min(320px, 70vw); background: #fff; border: 3px solid var(--ink); border-radius: 18px; padding: 8px 14px 10px; font-size: 18px; line-height: 1.25; box-shadow: 0 4px 0 rgba(29,43,54,0.9); animation: bubIn 0.18s ease-out; --tail: 50%; }
-.bubble::after { content: ''; position: absolute; bottom: -13px; left: var(--tail); width: 18px; height: 18px; background: #fff; border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: translateX(-50%) rotate(45deg) translateY(-50%); transform-origin: center; margin-bottom: 4px; }
+/* tail: a dark triangle with a white one inside, both hanging fully below the text */
+.bubble::before, .bubble::after { content: ''; position: absolute; top: 100%; left: var(--tail); transform: translateX(-50%); width: 0; height: 0; border-style: solid; border-color: transparent; border-bottom-width: 0; }
+.bubble::before { border-width: 16px 12px 0; border-top-color: var(--ink); }
+.bubble::after { border-width: 11px 8.25px 0; border-top-color: #fff; }
 .bubble.out { opacity: 0; transition: opacity 0.2s; }
 .bubble-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--teal-d); margin-bottom: 1px; }
 .bubble.small { font-size: 16px; padding: 5px 10px; font-weight: 700; color: #c21d3b; }
 .bubble.narrate { background: #fff8d6; font-style: italic; }
-.bubble.narrate::after { background: #fff8d6; }
+.bubble.narrate::after { border-top-color: #fff8d6; }
 @keyframes bubIn { from { opacity: 0; scale: 0.85; } }
 
 /* ---------- nurse ---------- */
