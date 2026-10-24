@@ -111,6 +111,7 @@ export async function play(G, P) {
   function frame(now) {
     raf = requestAnimationFrame(frame);
     let dt = Math.min(0.033, (now - last) / 1000); last = now;
+    if (G.E.paused) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const cw = Math.round(window.innerWidth * dpr), chh = Math.round(window.innerHeight * dpr);
     if (canvas.width !== cw || canvas.height !== chh) { canvas.width = cw; canvas.height = chh; }
@@ -218,7 +219,8 @@ export async function play(G, P) {
       ctx.fillStyle = '#1d2b36'; ctx.font = '700 18px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.fillText(String(100 + n * 2), dx + 60, GROUND - 244);
       const px = dx + 280;
       const posters = [['WASH', 'HANDS'], ['NO', 'RUNNING'], ['DR. CHAOS', 'EMPLOYEE?'], ['QUIET', 'PLEASE'], ['FLU', 'SHOTS!']];
-      const pt = posters[Math.abs(n) % posters.length];
+      // the last poster before the exit has a secret on it
+      const pt = dx + 560 > L - 200 ? ['CODE:', 'ZOOMIES'] : posters[Math.abs(n) % posters.length];
       ctx.fillStyle = '#fff'; ctx.fillRect(px, GROUND - 270, 110, 80); ctx.strokeStyle = '#2bb3a3'; ctx.lineWidth = 5; ctx.strokeRect(px, GROUND - 270, 110, 80);
       ctx.fillStyle = '#1d2b36'; ctx.font = '700 17px Fredoka, Arial'; ctx.fillText(pt[0], px + 55, GROUND - 238); ctx.fillText(pt[1], px + 55, GROUND - 214);
     }

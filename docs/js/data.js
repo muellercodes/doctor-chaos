@@ -30,22 +30,36 @@ const LAST = ['Pickles', 'Bumbleton', 'McGee', 'Featherstone', 'Wigglesworth', '
 const AGES = { kid: [6, 11], teen: [13, 17], adult: [22, 58], elder: [67, 93] };
 const VOICE = { kid: 1.55, teen: 1.2, adult: 0.95, elder: 0.82 };
 
+const EYES = ['#5a3a22', '#5a3a22', '#3b2416', '#3b2416', '#8e7240', '#4f7f4f', '#4a7ab5', '#6f8394'];
+const PRINT_COLORS = ['#ffffff', '#ffd23f', '#1d2b36', '#ff5d8f', '#7fdbff'];
 export function randomLook(ageGroup, gender) {
-  const old = ageGroup === 'elder';
-  const hairC = old ? pick(HAIR_OLD) : (ageGroup === 'teen' && Math.random() < 0.2 ? pick(HAIR_FUN) : pick(HAIR));
+  const old = ageGroup === 'elder', kid = ageGroup === 'kid', teen = ageGroup === 'teen';
+  const hairC = old ? pick(HAIR_OLD) : (teen && Math.random() < 0.2 ? pick(HAIR_FUN) : pick(HAIR));
   let style;
-  if (gender === 'm') style = old ? pick(['bald', 'bald', 'short', 'buzz']) : pick(['short', 'short', 'buzz', 'spiky', 'curly', 'afro']);
-  else style = old ? pick(['bun', 'short', 'curly', 'bob']) : ageGroup === 'kid' ? pick(['pigtails', 'ponytail', 'long', 'bob', 'curly', 'afro', 'bun']) : pick(['long', 'ponytail', 'bun', 'bob', 'curly', 'afro']);
+  if (gender === 'm') style = old ? pick(['bald', 'bald', 'short', 'buzz']) : pick(['short', 'short', 'buzz', 'spiky', 'curly', 'afro', 'slick']);
+  else style = old ? pick(['bun', 'short', 'curly', 'bob']) : kid ? pick(['pigtails', 'ponytail', 'long', 'bob', 'curly', 'afro', 'bun']) : pick(['long', 'ponytail', 'bun', 'bob', 'curly', 'afro']);
+  const shirtStyle = kid ? pick(['tee', 'tee', 'tee', 'hoodie']) : teen ? pick(['tee', 'tee', 'hoodie', 'hoodie', 'polo']) : old ? pick(['button', 'sweater', 'polo', 'sweater']) : pick(['tee', 'polo', 'button', 'sweater', 'hoodie']);
+  const shirt = pick(SHIRTS);
+  const print = (kid || teen) && shirtStyle === 'tee' && Math.random() < 0.65 ? pick(['star', 'heart', 'bolt', 'smile', 'planet', 'paw', 'dino']) : null;
   return {
     age: ageGroup, gender,
     skin: pick(SKIN),
     hair: { style, color: hairC },
-    shirt: pick(SHIRTS), pants: pick(PANTS), shoes: pick(SHOES),
-    sleeves: Math.random() < 0.4 ? 'long' : 'short',
-    shorts: ageGroup === 'kid' && Math.random() < 0.5,
+    eyes: pick(EYES),
+    nose: pick(kid ? ['button', 'button', 'regular'] : ['regular', 'regular', 'long', 'wide', 'button']),
+    build: kid ? pick(['slim', 'avg', 'avg']) : pick(['slim', 'avg', 'avg', 'stocky', 'round']),
+    tall: kid ? rand(0.96, 1.04) : rand(0.95, 1.05),
+    shirt, pants: pick(PANTS), shoes: pick(SHOES),
+    shirtStyle, print, printColor: pick(PRINT_COLORS.filter(c => c !== shirt)),
+    sleeves: shirtStyle === 'sweater' || shirtStyle === 'hoodie' ? 'long' : shirtStyle === 'button' ? (Math.random() < 0.6 ? 'long' : 'short') : (Math.random() < 0.25 ? 'long' : 'short'),
+    shorts: kid ? Math.random() < 0.5 : teen ? Math.random() < 0.2 : false,
+    socks: pick(['#ffffff', '#ffffff', '#1d2b36', '#ff5d8f', '#ffd23f']),
+    shoeStyle: old ? pick(['flat', 'flat', 'sneaker']) : pick(['sneaker', 'sneaker', 'boot', 'flat']),
+    belt: (shirtStyle === 'button' || shirtStyle === 'polo') && !kid && Math.random() < 0.6,
+    freckles: (kid || teen) && Math.random() < 0.25,
     glasses: Math.random() < (old ? 0.6 : 0.18),
     beard: gender === 'm' && (ageGroup === 'adult' || old) && Math.random() < 0.35 ? pick(['full', 'mustache']) : null,
-    stripes: Math.random() < 0.12 ? [pick(SHIRTS), '#ffffff'] : null,
+    stripes: shirtStyle === 'tee' && !print && Math.random() < 0.18 ? [shirt, '#ffffff'] : null,
   };
 }
 
@@ -75,28 +89,53 @@ const C = {
 };
 
 export const REMARKS = {
-  kid: ['Are you a real doctor or a YouTube doctor?', 'When I grow up I want to be a doctor. Or a dragon. Probably a dragon.', 'My dad says this visit costs an arm and a leg. Do you need my arm?', 'Can I have a lollipop after? Can I have TWO?', "Is it gonna hurt? Don't answer. Your face answered.", "My hamster had surgery once. He's fine. Well... he's a different hamster now."],
-  teen: ['This is literally so awkward.', 'Can you make it look cooler? Like I got it in a sword fight?', "My mom's going to post about this. I just know it.", 'Do I get a sticker? ...Asking for a friend.'],
-  adult: ['Did you go to a real medical school, or one of the cheaper ones?', 'On a scale of 1 to 10, how sure are you about this?', "I wrote my will in the waiting room. You're not in it.", 'Should I be worried that the nurse is praying?', "My cousin's a doctor too. Well. He watches a lot of doctor shows.", 'Your hands are cold. Are you a vampire? ...Are you?'],
-  elder: ['In my day, we just rubbed dirt on it.', "I've had worse. I was alive in the '70s.", 'You look twelve. Are you twelve?', 'My last doctor retired. I think it was because of me.', "Speak up! I can't hear you over my hip."],
+  kid: ['Are you a real doctor or a YouTube doctor?', 'When I grow up I want to be a doctor. Or a dragon. Probably a dragon.', 'My dad says this visit costs an arm and a leg. Do you need my arm?', 'Can I have a lollipop after? Can I have TWO?', "Is it gonna hurt? Don't answer. Your face answered.", "My hamster had surgery once. He's fine. Well... he's a different hamster now.",
+    'Do doctors have to go to school forever? That sounds terrible.', 'I can wiggle my ears. Wanna see? ...Okay, I can wiggle ONE ear.', 'My grandma says I have the bones of a bird. Is that bad?', 'Is that a real skeleton in the closet? Can I meet him?',
+    'I ate a crayon once. The blue one. It tasted blue.', 'If I am brave, do I get a superhero name?', 'My brother said doctors steal your belly button. Is that true?', "I'm not scared. My knees are scared. I'm fine.",
+    'Do you have a dog? Doctors should have dogs.', 'I know how to count to a million. Want me to start?', 'Why is the paper on the bed so crinkly?', 'My teacher says I ask too many questions. Why does she say that?'],
+  teen: ['This is literally so awkward.', 'Can you make it look cooler? Like I got it in a sword fight?', "My mom's going to post about this. I just know it.", 'Do I get a sticker? ...Asking for a friend.',
+    'Is there Wi-Fi in here? Asking for medical reasons.', "Don't tell my friends I was here. Or tell them I was very brave.", 'Do you have a phone charger? Mine is on 2 percent. This is an emergency too.', 'My coach says walk it off. I walked it off. It followed me.',
+    'Can you write me a note so I can skip gym forever?', 'My phone says I have the flu, a broken toe and a rare frog disease.', 'Okay but like, is this going to leave a cool scar?', 'I have a test tomorrow. Can you find something wrong with me?',
+    'My little brother is going to be SO jealous of this cast.', "I'm only here because my mom made me. Also because it hurts.", 'Please do not call me "buddy." I am fifteen.'],
+  adult: ['Did you go to a real medical school, or one of the cheaper ones?', 'On a scale of 1 to 10, how sure are you about this?', "I wrote my will in the waiting room. You're not in it.", 'Should I be worried that the nurse is praying?', "My cousin's a doctor too. Well. He watches a lot of doctor shows.", 'Your hands are cold. Are you a vampire? ...Are you?',
+    'I looked up my symptoms online. Apparently I have three days to live.', 'I have a meeting in twenty minutes. Can we speed-run this?', 'Is this covered by insurance? Do not answer that.', 'I took the day off for this. My boss thinks I am at a funeral.',
+    'My kids think I am at the gym. Please do not tell them.', 'Can you also look at my back? Not medically. Just look at it. It is a weird back.', 'I brought snacks in case this takes a while. Want a pretzel?', 'Every time I come here, the magazines are older.',
+    'I am usually very brave. This is the exception.', "I've been practicing my calm face. How's it look?", 'You seem young. Like, internet young.', 'The parking here costs more than the medicine.'],
+  elder: ['In my day, we just rubbed dirt on it.', "I've had worse. I was alive in the '70s.", 'You look twelve. Are you twelve?', 'My last doctor retired. I think it was because of me.', "Speak up! I can't hear you over my hip.",
+    'I walked here. Uphill. It was flat, but it felt uphill.', 'Back in my day doctors made house calls. On horses.', "I've outlived three doctors. Don't take it personally.", 'Is this one of those computer doctors? Are you an app?',
+    'Make it quick, I left my soup on the stove. In 1987.', 'My knees predict the weather. They say it will rain on you.', 'I knit this sweater myself. It took nine years.', 'Do you know my grandson? He is also a doctor. Of computers.',
+    'I am ninety percent tea at this point.', 'You kids and your fancy stethoscopes. We listened with a cup.', 'I have a coupon for this. Somewhere. In my purse. Hold on.'],
 };
 export const SUCCESS = {
-  kid: ['That was AWESOME. Do it again! ...No, wait, don\'t.', 'Can I have a sticker now?', "I didn't even cry! Okay, I cried a LITTLE."],
-  teen: ['Okay... that was actually kind of fine.', "Wait, that's it? Cool. Don't tell anyone I was scared."],
-  adult: ["Hey, that wasn't so bad!", "I didn't even feel that. Did you do it yet?", "You're better than my last doctor. He was a dentist."],
-  elder: ['Not bad, kid. Not bad at all.', "Well, I'll be. You're a real doctor after all."],
+  kid: ['That was AWESOME. Do it again! ...No, wait, don\'t.', 'Can I have a sticker now?', "I didn't even cry! Okay, I cried a LITTLE.", 'I am telling EVERYONE at school about this.', 'You are my favorite doctor. You are my only doctor. Still my favorite.', 'Wait, that was it? I was ready to be SO brave.', 'Can I keep the bandage? I want to frame it.', 'Best. Checkup. EVER.'],
+  teen: ['Okay... that was actually kind of fine.', "Wait, that's it? Cool. Don't tell anyone I was scared.", 'Not gonna lie, you are kind of good at this.', 'I am rating you five stars. Out of five. Yeah.', 'That was way less bad than my mom said.', 'Cool. Can I go now? I have a thing. The thing is a nap.'],
+  adult: ["Hey, that wasn't so bad!", "I didn't even feel that. Did you do it yet?", "You're better than my last doctor. He was a dentist.", 'I feel like a whole new person. A slightly sore new person.', 'I am going to leave you a very nice review. Maybe two.', 'Thank you, doctor. I take back what I said about the cheap medical school.', 'Honestly? That went better than my last haircut.'],
+  elder: ['Not bad, kid. Not bad at all.', "Well, I'll be. You're a real doctor after all.", 'You have good hands. Like a piano player. Or a pickpocket.', 'I am going to tell my bridge club about you. They will be jealous.', 'That was smoother than my last three hip replacements.', 'Thank you, dear. Here, have a butterscotch.'],
 };
-export const FAIL = ["I'm calling my lawyer. Right after I call my mom.", 'That... was NOT great.', "I'm leaving a review. A LONG one.", 'My lawyer is going to LOVE you.', 'I feel worse than when I came in. Impressive, really.'];
+export const FAIL = ["I'm calling my lawyer. Right after I call my mom.", 'That... was NOT great.', "I'm leaving a review. A LONG one.", 'My lawyer is going to LOVE you.', 'I feel worse than when I came in. Impressive, really.',
+  'I came here to get better. I got worse. That is the opposite.', 'My grandma could have done that. My grandma is a cat.', 'I want to speak to the manager of doctors.', 'Wow. Just... wow. Not the good wow.', 'I am telling my lawyer, my mom, AND my cat.', 'Is that blood? That is blood. That is MY blood. I am suing.', 'Next time I am going to the vet. At least they give treats.'];
 export const WRONG_TOOL = {
-  tweezers: ['Tweezers?! What are you gonna do, pluck my eyebrows?', "I don't need tweezers. Unless you plan on picking a fight."],
-  shot: ['Whoa whoa whoa. Put the needle DOWN.', "A needle? For THIS? Read the chart, doc!"],
-  blood: ['You want my BLOOD? For THIS?', "No blood tests! I'm using all of it right now!"],
-  surgery: ['Why are you holding a scalpel?! PUT IT DOWN.', 'SURGERY?! I came in for something small!'],
-  reflex: ['Why are you holding a tiny hammer?', 'If you bonk me with that, I bonk you back.'],
-  steth: ["You're listening to my heart? It's saying 'wrong tool.'", 'My heart is fine! It\'s the OTHER thing!'],
-  cast: ["A cast? Nothing's broken! ...Yet.", "I don't need a cast. Is that a threat?"],
+  tweezers: ['Tweezers?! What are you gonna do, pluck my eyebrows?', "I don't need tweezers. Unless you plan on picking a fight.", 'Those are for splinters. I do not have splinters. I have PROBLEMS.'],
+  shot: ['Whoa whoa whoa. Put the needle DOWN.', "A needle? For THIS? Read the chart, doc!", 'If you poke me with that for no reason, I am poking you back.'],
+  blood: ['You want my BLOOD? For THIS?', "No blood tests! I'm using all of it right now!", 'My blood is fine. My blood is great. Leave my blood alone.'],
+  surgery: ['Why are you holding a scalpel?! PUT IT DOWN.', 'SURGERY?! I came in for something small!', 'NOPE. No cutting. I came in walking, I would like to leave walking.'],
+  reflex: ['Why are you holding a tiny hammer?', 'If you bonk me with that, I bonk you back.', 'Is this a doctor visit or a game of whack-a-mole?'],
+  steth: ["You're listening to my heart? It's saying 'wrong tool.'", 'My heart is fine! It\'s the OTHER thing!', 'My heart is beating very fast. Because you picked the wrong tool.'],
+  cast: ["A cast? Nothing's broken! ...Yet.", "I don't need a cast. Is that a threat?", 'Wrapping me up like a burrito will NOT fix this.'],
 };
-export const NURSE_QUIPS = ['Doctor... maybe read the chart?', "I've seen worse. Not much worse.", 'I just work here.', 'Remember, they can sue.', 'Deep breaths. For you, not them.'];
+export const NURSE_QUIPS = ['Doctor... maybe read the chart?', "I've seen worse. Not much worse.", 'I just work here.', 'Remember, they can sue.', 'Deep breaths. For you, not them.',
+  'The chart is the clipboard. With the words on it.', 'I am going to pretend I did not see that.', 'Should I call a real doctor? Kidding. Mostly.', 'That is a bold choice, Doctor.', 'I have a lawyer on speed dial. Just saying.', 'Interesting. Wrong, but interesting.', 'Try the one that matches the problem.'];
+export const IMPATIENT = {
+  kid: ['Are we done yet?', 'I am SO bored. Can I play with the hammer?', 'Doctor? Hello? Are you asleep?', 'I counted the ceiling tiles. There are a LOT.'],
+  teen: ['Uh... any day now.', 'I could have watched three videos by now.', 'Is this part of the treatment? The waiting?'],
+  adult: ['Take your time. Not too much time.', 'I am being charged by the minute, right? I can feel it.', 'Should I come back tomorrow?'],
+  elder: ['I am not getting any younger here.', 'I have had shorter naps than this.', 'Wake me up when you pick something.'],
+};
+export const BYE = {
+  happy: ['Bye, doc! See you never! In a good way!', 'Thanks, doctor! You rock!', 'Bye! I will tell everyone you are great!', 'See ya! Not too soon, hopefully.', 'Bye, Nurse Pat! Bye, doctor!', 'Thank you! I feel amazing. Mostly.'],
+  sad: ['Hmph. Goodbye.', 'I want my lollipop back. Oh wait, I never got one.', 'Bye. My lawyer will text you.', 'I am never coming back. Unless I get hurt again.', 'Well. That happened.'],
+};
+export const PICKLES_LINES = ["Psst. Doc. The secret code is PICKLES. Dave told me. Don't tell Dave I told you.", 'Hey, do you know the code PICKLES? Some guy named Dave keeps whispering it in the waiting room.'];
 
 export const LAWSUIT = {
   removal: 'The {obj} is still in my {where}. I can hear it. It is laughing at me.',
@@ -118,12 +157,15 @@ export const LAWSUIT = {
   triplets: "The doctor gave a shot to the WRONG triplet. Twice. Our mom is very upset. And confused.",
 };
 export const REVIEWS = {
-  3: ['Barely felt a thing. Would get injured again.', 'Fast, friendly, and only a little terrifying.', 'Gave me a lollipop AND my dignity back.', '10/10. The doctor did not scream even once.', 'Best doctor I ever had. And I have had SEVEN this year.'],
-  2: ['It went fine. The doctor hummed scary music the whole time though.', 'Good doctor. Weird hammer.', 'Solid work. The nurse was nicer, though.', 'Pretty good! Only one tiny "oops."'],
-  1: ['I came in with one problem. I left with two.', "I've had better. I've also had worse. Mostly better.", "The doctor said 'oops' twice. TWICE."],
-  0: ['My lawyer will be in touch.', 'Do not recommend. My cat would have done better.', "I'm telling EVERYONE. Even my dentist."],
+  3: ['Barely felt a thing. Would get injured again.', 'Fast, friendly, and only a little terrifying.', 'Gave me a lollipop AND my dignity back.', '10/10. The doctor did not scream even once.', 'Best doctor I ever had. And I have had SEVEN this year.', 'I would let this doctor fix my car. That is a compliment.', 'Five stars. Would have given six but the chairs are lumpy.', 'My mom cried. Good tears. I think.', 'Professional, gentle, and the bandage was a nice color.'],
+  2: ['It went fine. The doctor hummed scary music the whole time though.', 'Good doctor. Weird hammer.', 'Solid work. The nurse was nicer, though.', 'Pretty good! Only one tiny "oops."', 'Got the job done. Took the scenic route.', 'Decent. The waiting room has excellent magazines from 2009.', 'Would come back. Would bring a helmet.'],
+  1: ['I came in with one problem. I left with two.', "I've had better. I've also had worse. Mostly better.", "The doctor said 'oops' twice. TWICE.", 'It worked, I think? I am not sure what "worked" means anymore.', 'The bandage is on my elbow. My problem was my foot.', 'One star for showing up. That is it.'],
+  0: ['My lawyer will be in touch.', 'Do not recommend. My cat would have done better.', "I'm telling EVERYONE. Even my dentist.", 'I would give zero stars but the app will not let me.', 'Worst visit since the time I visited a volcano.', 'I left a review on every website. Even the weather one.'],
 };
-export const FORECAST = ['Forecast: 100% chance of chaos.', "The hospital's insurance company sent flowers. And a warning.", 'Nurse Pat brought donuts. Either nice or a bribe.', 'The waiting room smells like fear and hand sanitizer.', 'Rumor has it someone in the waiting room is wearing a cape.', "Today's lunch special: hospital pudding. Again."];
+export const WELCOME_BACK = ['Nurse Pat kept your chair warm. She was sitting in it.', 'The patient waited. They read every magazine. Twice.', 'Nobody noticed you were gone. Nurse Pat noticed.', 'The waiting room clock moved. Everything else stayed exactly the same.', 'Your coffee is cold now. That is on you.', 'The next patient has been practicing their excuse.'];
+export const FORECAST = ['Forecast: 100% chance of chaos.', "The hospital's insurance company sent flowers. And a warning.", 'Nurse Pat brought donuts. Either nice or a bribe.', 'The waiting room smells like fear and hand sanitizer.', 'Rumor has it someone in the waiting room is wearing a cape.', "Today's lunch special: hospital pudding. Again.",
+  'The vending machine is out of everything except one sad raisin.', 'Someone left a goose in the parking lot. Not a patient. Probably.', 'The elevator music today is just one guy humming.', 'Nurse Pat is in a great mood. Nobody knows why. Everyone is nervous.', 'A kid in the waiting room is building a fort out of chairs.', 'The coffee machine made a noise like a dying robot. Coffee is canceled.',
+  'Somebody stole all the good pens. Again.', 'The hospital cat is wearing a stethoscope. It is doing better than you.', 'There is a mysterious puddle in hallway B. Do not step in it.', 'The front desk phone has rung 400 times. Nobody answered it.', 'A pigeon got into the lobby and is now the most popular patient.', 'The janitor says today "feels like a sneezy one."'];
 
 // ---------- builders ----------
 function fill(t, c, step) {
@@ -169,7 +211,7 @@ const PERSONALITIES = {
   vampire(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Vlad', name: 'Count Vlad Nightshade', age: 547, ageLabel: '547 (he says 29)', voice: 0.7, personality: 'vampire' });
-    Object.assign(c.look, { skin: '#ece6f5', hair: { style: 'slick', color: '#111111' }, shirt: '#1a1a2e', pants: '#1a1a2e', shoes: '#111111', outfit: 'vampire', glasses: false, beard: null, stripes: null, sleeves: 'long' });
+    Object.assign(c.look, { skin: '#ece6f5', hair: { style: 'slick', color: '#111111' }, shirt: '#1a1a2e', pants: '#1a1a2e', shoes: '#111111', outfit: 'vampire', glasses: false, beard: null, stripes: null, sleeves: 'long', shirtStyle: 'button', print: null, belt: false, shorts: false, shoeStyle: 'boot' });
     c.steps = ['blood'];
     c.complaint = line('vampire', ['I am here for a blood test. Yes. I am aware of the irony.', 'Blood test, please. For once, I am the one giving. Do not get used to it.', 'My doctor wants a blood sample. I have plenty. Most of it is borrowed.'], used);
     c.remarks = ['Careful with that. It is vintage.', 'In my day, we did this with our teeth.', 'Do you need my ID? It is from the 1400s.', 'Mmm. Smells... no. No. Focus, Vlad.'];
@@ -179,7 +221,7 @@ const PERSONALITIES = {
   pirate(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Barnaby', name: 'Captain Barnaby Saltbeard', ageLabel: String(c.age), voice: 0.78, personality: 'pirate' });
-    Object.assign(c.look, { hair: { style: 'short', color: '#3b2a20' }, beard: 'full', outfit: 'pirate', stripes: ['#ffffff', '#e63946'], glasses: false, pants: '#2b2d42' });
+    Object.assign(c.look, { hair: { style: 'short', color: '#3b2a20' }, beard: 'full', outfit: 'pirate', stripes: ['#ffffff', '#e63946'], glasses: false, pants: '#2b2d42', shirtStyle: 'tee', print: null, shoeStyle: 'boot', shorts: false });
     c.steps = ['removal'];
     c.params.removal = { object: 'coin', where: 'ear', name: 'gold doubloon' };
     c.complaint = line('pirate', ['Arr, there be a doubloon stuck in me ear, doc. Long story. Involves a parrot.', "Ahoy! A gold coin be stuck in me ear. Me crew bet I couldn't hide treasure there. I could.", 'Arr, me parrot buried treasure in me ear while I slept. Dig it out, doc!'], used);
@@ -190,7 +232,7 @@ const PERSONALITIES = {
   trench(used) {
     const c = baseCase('adult', 'm');
     Object.assign(c, { first: 'Greg', name: 'Totally Normal Adult Man (Greg)', ageLabel: '47 (human years)', voice: 1.45, personality: 'trench' });
-    Object.assign(c.look, { tall: 1.28, outfit: 'trench', glasses: 'sun', beard: null, hair: { style: 'none', color: '#3b2a20' }, shirt: '#b08d57', pants: '#2b2d42', sleeves: 'long', skin: pick(SKIN.slice(0, 6)), stripes: null });
+    Object.assign(c.look, { tall: 1.28, outfit: 'trench', glasses: 'sun', beard: null, hair: { style: 'none', color: '#3b2a20' }, shirt: '#b08d57', pants: '#2b2d42', sleeves: 'long', skin: pick(SKIN.slice(0, 6)), stripes: null, shirtStyle: 'tee', print: null, belt: false, shorts: false, shoeStyle: 'flat', build: 'avg' });
     c.steps = ['steth'];
     c.params.steth = { variant: 'trench' };
     c.complaint = line('trench', ['Hello. I am one normal adult human. I would like one normal checkup. And possibly a lollipop.', 'Greetings, doctor. I am a tall, regular grown-up. Please check my heart. Heart. Just the one.', 'I am here for an adult checkup. I drove here in my adult car. I have a job. At the office. Of adults.'], used);
@@ -202,7 +244,7 @@ const PERSONALITIES = {
     const gender = pick(['m', 'f']);
     const c = baseCase('adult', gender);
     Object.assign(c, { first: 'Marcel', name: gender === 'm' ? 'Marcel the Mime' : 'Mimi the Mime', ageLabel: '???', voice: 0, personality: 'mime' });
-    Object.assign(c.look, { skin: '#f7f7f7', stripes: ['#111111', '#ffffff'], outfit: 'mime', pants: '#111111', glasses: false, beard: null, sleeves: 'long' });
+    Object.assign(c.look, { skin: '#f7f7f7', stripes: ['#111111', '#ffffff'], outfit: 'mime', pants: '#111111', glasses: false, beard: null, sleeves: 'long', shirtStyle: 'tee', print: null, belt: false, shorts: false, shoes: '#111111', shoeStyle: 'flat' });
     c.steps = [pick(['shot', 'reflex'])];
     c.complaint = c.steps[0] === 'shot'
       ? line('mime', ['(Mimes a giant needle. Then mimes fainting. Then mimes being fine.)', '(Pretends to roll up a sleeve. Points at arm. Covers eyes.)'], used)
@@ -398,7 +440,7 @@ export function generateDay(day, opts = {}) {
 export function tutorialPatient() {
   const c = baseCase('adult', 'm');
   Object.assign(c, { first: 'Dave', name: 'Dave Pickles', age: 34, ageLabel: '34', voice: 0.95 });
-  Object.assign(c.look, { skin: '#f1c27d', hair: { style: 'short', color: '#6d4c2f' }, shirt: '#ff8a2a', pants: '#3d5a80', glasses: false, beard: 'mustache', stripes: null });
+  Object.assign(c.look, { skin: '#f1c27d', hair: { style: 'short', color: '#6d4c2f' }, shirt: '#ff8a2a', pants: '#3d5a80', glasses: false, beard: 'mustache', stripes: null, shirtStyle: 'tee', print: null, eyes: '#5a3a22', nose: 'regular', build: 'avg', tall: 1, belt: false, shorts: false, sleeves: 'short', shoeStyle: 'sneaker' });
   c.steps = ['shot', 'removal'];
   c.params.removal = { object: 'marble', where: 'ear', name: 'marble' };
   c.complaint = "Hey doc. I stepped on a rusty nail, so I need a tetanus shot. Also, unrelated, there's a marble in my ear.";

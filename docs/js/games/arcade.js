@@ -32,6 +32,7 @@ export function openArcade(G, { VH = 540, song = 'chase', buttons = [] } = {}) {
       const loop = now => {
         raf = requestAnimationFrame(loop);
         const dt = Math.min(0.033, (now - last) / 1000); last = now;
+        if (G.E.paused) return;
         view.dpr = Math.min(2, window.devicePixelRatio || 1);
         const cw = Math.round(window.innerWidth * view.dpr), ch = Math.round(window.innerHeight * view.dpr);
         if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }

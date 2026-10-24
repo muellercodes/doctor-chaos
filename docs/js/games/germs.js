@@ -22,7 +22,7 @@ export async function play(G, P) {
   for (let i = 0; i < 26; i++) cells.push({ x: rand(0, 1), y: rand(0, 540), r: rand(10, 40), s: rand(30, 90), a: rand(0.08, 0.2) });
   let state = 'intro', stT = 0, t = 0, spawnT = 0, spawned = 0, killed = 0, splat = 0;
   const TOTAL = 34 + Math.round(diff * 10);
-  let boss = null, bossDone = false, bossSay = null, bossSayT = 0;
+  let boss = null, bossDone = false, bossSay = null, bossSayT = 0, lastWords = null, lastPos = null;
   G.dbg = { kind: 'germs', ship, germs, snot, get boss() { return boss; }, get state() { return state; } };
 
   const result = await A.run((dt, view) => {
@@ -88,7 +88,7 @@ export async function play(G, P) {
         }
         if (!s.dead && boss && Math.abs(s.x - boss.x) < 70 && Math.abs(s.y - boss.y) < 55) {
           s.dead = true; boss.hp--; boss.hitT = 0.08; sfx.pop();
-          if (boss.hp <= 0) { bossDone = true; pp.add('KING GERM DEFEATED!', boss.x, boss.y, '#ff8a2a', 30); boss = null; state = 'win'; stT = 0; sfx.great(); }
+          if (boss.hp <= 0) { bossDone = true; pp.add('KING GERM DEFEATED!', boss.x, boss.y, '#ff8a2a', 30); lastPos = { x: boss.x, y: boss.y }; if (Math.random() < 0.5) lastWords = 'Remember... the code... is SQUEAKY...'; boss = null; state = 'win'; stT = 0; sfx.great(); }
         }
       }
       // collisions: ship vs snot/germs
@@ -101,7 +101,7 @@ export async function play(G, P) {
       for (let i = snot.length - 1; i >= 0; i--) if (snot[i].dead || snot[i].y > VH + 20 || snot[i].y < -20 || snot[i].x < -20 || snot[i].x > VW + 20) snot.splice(i, 1);
       if (t > 60) { state = 'timeout'; stT = 0; sfx.bad(); }
     }
-    if ((state === 'win' || state === 'timeout') && stT > 2) {
+    if ((state === 'win' || state === 'timeout') && stT > (lastWords ? 3 : 2)) {
       const ratio = killed / Math.max(1, spawned);
       return { score: clamp(30 + 50 * ratio + (bossDone ? 25 : 0) - ship.hits * 4, 20, 100), boss: bossDone };
     }
@@ -119,6 +119,7 @@ export async function play(G, P) {
     for (const g of germs) drawGerm(ctx, g, t);
     if (boss) drawBoss(ctx, boss, t);
     if (boss && bossSayT > 0) bubble(ctx, bossSay, boss.x, boss.y - 70);
+    if (state === 'win' && lastWords && lastPos) bubble(ctx, lastWords, clamp(lastPos.x, 200, VW - 200), Math.max(140, lastPos.y + 40));
     drawSub(ctx, ship, t);
     pp.draw(ctx, dt);
     if (splat > 0) { ctx.globalAlpha = Math.min(0.6, splat * 0.5); ctx.fillStyle = '#8ac926'; for (const [x, y, r] of [[0.3, 0.4, 120], [0.65, 0.3, 90], [0.5, 0.65, 140]]) { ctx.beginPath(); ctx.arc(x * VW, y * VH, r, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }

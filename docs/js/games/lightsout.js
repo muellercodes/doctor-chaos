@@ -49,6 +49,9 @@ export async function play(G, P) {
   const gh = { ...pick(far.length ? far : cells), bob: 0, found: false };
   const decor = [];
   for (let i = 0; i < 22; i++) { const cc = pick(cells); decor.push({ x: cc.x + rand(-16, 16), y: cc.y + rand(-16, 16), k: pick(['paper', 'duck', 'bucket', 'chair', 'skeleton']) }); }
+  // a note scribbled on the floor somewhere, only readable in the flashlight
+  const mid = cells.filter(cc => cc.d >= 3 && cc.x !== gh.x);
+  const note = pick(mid.length ? mid : cells);
   const pp = makePops();
   const dark = document.createElement('canvas');
   const dctx = dark.getContext('2d');
@@ -119,6 +122,7 @@ export async function play(G, P) {
       else { ctx.fillStyle = (tx + ty) % 2 ? '#dcebe7' : '#eef6f3'; ctx.fillRect(x, y, T, T); }
     }
     for (const d of decor) drawDecor(ctx, d);
+    ctx.save(); ctx.translate(note.x, note.y); ctx.rotate(-0.15); ctx.fillStyle = 'rgba(120,60,160,0.75)'; ctx.font = '700 10px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.fillText('psst... code:', 0, -4); ctx.font = '700 13px Fredoka, Arial'; ctx.fillText('GHOST', 0, 10); ctx.restore();
     drawGhost(ctx, gh, t, state === 'found');
     drawDoc(ctx, pl, G.coatColor || '#ffffff');
     ctx.restore();

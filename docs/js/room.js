@@ -140,10 +140,10 @@ export function buildRoom(scene) {
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = '#1d2b36'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, W - 10, H - 10);
     ctx.fillStyle = '#1d2b36'; ctx.textAlign = 'center';
-    const rows = [['E', 110], ['F P', 64], ['T O Z', 46], ['L P E D', 34], ['P E C F D', 26], ['I M A D O C', 20], ['N O T R E A L L Y', 15]];
-    let y = 110;
-    for (const [t, s] of rows) { ctx.font = `700 ${s}px Arial, sans-serif`; ctx.fillText(t, W / 2, y); y += s * 1.0 + 14; }
-  }).tex;
+    const rows = [['E', 92], ['F P', 56], ['T O Z', 42], ['L P E D', 32], ['P E C F D', 25], ['I M A D O C', 19], ['N O T R E A L L Y', 14], ['C O D E :  B I G H E A D', 7]];
+    let y = 26;
+    for (const [t, s] of rows) { y += s; ctx.font = `700 ${s}px Arial, sans-serif`; ctx.fillText(t, W / 2, y); y += 12; }
+  }, 2).tex;
   scene.add(planeTex(0.62, 0.86, eye, 1.25, 1.62, -2.585));
   scene.add(planeTex(0.72, 0.54, textPoster([
     { text: 'WASH YOUR', size: 64, bold: true }, { text: 'HANDS', size: 96, bold: true, color: '#2bb3a3' }, { text: '(please)', size: 40 },
@@ -181,6 +181,7 @@ export function buildRoom(scene) {
   const hH = box(0.025, 0.11, 0.01, '#1d2b36', 0, 0.05, 0.03); const hP = new THREE.Group(); hP.position.z = 0.0; hP.add(hH); clock.add(hP);
   const mH = box(0.016, 0.16, 0.01, '#1d2b36', 0, 0.075, 0.035); const mP = new THREE.Group(); mP.add(mH); clock.add(mP);
   scene.add(clock);
+  R.clock = clock;
   R.updateClock = () => { const d = new Date(); mP.rotation.z = -(d.getMinutes() + d.getSeconds() / 60) / 60 * Math.PI * 2; hP.rotation.z = -((d.getHours() % 12) + d.getMinutes() / 60) / 12 * Math.PI * 2; };
 
   // ---------- door ----------
@@ -312,6 +313,7 @@ export function buildRoom(scene) {
       leaf.rotation.set(Math.sin(a) * 0.5, -a, Math.cos(a) * 0.5);
       leaves.add(leaf);
     }
+    R.plant = g;
     const s = spot('plant', 'big plant', g, new THREE.Vector3(-3.4, 0, -1.3), { pan: -0.9 });
     s.tell = E => E.tween(0.8, (k, raw) => { leaves.rotation.z = Math.sin(raw * 30) * 0.08 * (1 - raw); leaves.rotation.x = Math.cos(raw * 26) * 0.06 * (1 - raw); }, ease.linear);
     s.open = E => E.tween(0.4, (k, raw) => { leaves.rotation.z = Math.sin(raw * 30) * 0.2; });

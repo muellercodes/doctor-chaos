@@ -39,10 +39,11 @@ export function toon(color, opts = {}) {
 }
 function stripOpts(o) { const r = { ...o }; delete r.unique; return r; }
 
-export function canvasTexture(w, h, draw) {
+export function canvasTexture(w, h, draw, scale = 1) {
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
+  c.width = w * scale; c.height = h * scale;
   const ctx = c.getContext('2d');
+  if (scale !== 1) ctx.scale(scale, scale);
   draw(ctx, w, h);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -179,7 +180,7 @@ export function createEngine(canvas) {
   function home(dur = 0.9) {
     return frame(new THREE.Vector3(0, 1.22, 0), 3.1, 2.3, HOME_POS.clone().sub(HOME_TARGET), dur, 1.0);
   }
-  function shake(a) { shakeAmt = Math.max(shakeAmt, a); }
+  function shake(a) { if (noShake) return; shakeAmt = Math.max(shakeAmt, a); }
 
   // ---------- picking ----------
   const raycaster = new THREE.Raycaster();
@@ -230,6 +231,7 @@ export function createEngine(canvas) {
 
   // ---------- loop ----------
   let last = performance.now();
+  let paused = false, noShake = false;
   let fpsAcc = 0, fpsN = 0, fps = 60;
   function loop(now) {
     requestAnimationFrame(loop);
@@ -237,6 +239,7 @@ export function createEngine(canvas) {
     last = now;
     if (dt > MAXDT) dt = MAXDT;
     if (dt <= 0) return;
+    if (paused) { if (!paused3D) renderer.render(scene, camera); return; }
     time += dt;
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 1) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; }
@@ -267,6 +270,15 @@ export function createEngine(canvas) {
     get time() { return time; },
     get fps() { return fps; },
     set paused3D(v) { paused3D = v; },
+    setQuality(fast) {
+      if (QS.has('lowq')) return;
+      renderer.setPixelRatio(fast ? Math.min(window.devicePixelRatio || 1, 1) * 0.65 : Math.min(window.devicePixelRatio || 1, 2));
+      if (renderer.shadowMap.enabled === fast) { renderer.shadowMap.enabled = !fast; scene.traverse(o => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { m.needsUpdate = true; }); }); }
+      resize();
+    },
+    get paused() { return paused; },
+    set paused(v) { paused = v; },
+    set noShake(v) { noShake = v; if (v) shakeAmt = 0; },
     get paused3D() { return paused3D; },
     resize,
   };

@@ -1,0 +1,10 @@
+# Cloudflare Pages config for Doctor Chaos.
+# The game itself is the static site in docs/. functions/ adds the small accounts + leaderboard API.
+name = "doctor-chaos"
+pages_build_output_dir = "docs"
+compatibility_date = "2026-06-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "doctor-chaos-db"
+database_id = "a49c4058-2ae9-4336-b47c-16f430268f62"

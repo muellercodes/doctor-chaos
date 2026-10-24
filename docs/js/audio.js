@@ -2,6 +2,8 @@
 let ctx = null;
 let master = null;
 let musicGain = null;
+let sfxBus = null;
+let sfxVol = 1, musicVol = 1, pitchMul = 1;
 let muted = false;
 let noiseBuf = null;
 
@@ -14,8 +16,11 @@ function ensure() {
   master.gain.value = muted ? 0 : 0.8;
   master.connect(ctx.destination);
   musicGain = ctx.createGain();
-  musicGain.gain.value = 0.22;
+  musicGain.gain.value = 0.22 * musicVol;
   musicGain.connect(master);
+  sfxBus = ctx.createGain();
+  sfxBus.gain.value = sfxVol;
+  sfxBus.connect(master);
   const len = ctx.sampleRate * 1.5;
   noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);
@@ -37,7 +42,7 @@ function tone({ freq = 440, type = 'sine', dur = 0.15, vol = 0.3, attack = 0.005
   let node = g;
   o.connect(g);
   if (pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; g.connect(p); node = p; }
-  node.connect(dest || master);
+  node.connect(dest || sfxBus);
   o.start(t); o.stop(t + dur + 0.05);
 }
 
@@ -56,7 +61,7 @@ function noise({ dur = 0.3, vol = 0.3, freq = 1200, q = 1, type = 'bandpass', sl
   s.connect(f); f.connect(g);
   let node = g;
   if (pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; g.connect(p); node = p; }
-  node.connect(master);
+  node.connect(sfxBus);
   s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
 }
 
@@ -64,12 +69,15 @@ export const sfx = {
   unlock() { const c = ensure(); if (c && c.state === 'suspended') c.resume(); },
   get muted() { return muted; },
   setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; },
+  setVolumes(sv, mv) { sfxVol = sv; musicVol = mv; if (sfxBus) sfxBus.gain.value = sv; if (musicGain) musicGain.gain.value = 0.22 * mv; },
+  set pitch(v) { pitchMul = v; },
+  get pitch() { return pitchMul; },
   blip(p = 1) { tone({ freq: 520 * p, type: 'square', dur: 0.06, vol: 0.05 }); },
   babble(text, pitch = 1) {
     const letters = text.replace(/[^a-z]/gi, '').slice(0, 26);
     for (let i = 0; i < letters.length; i += 2) {
       const code = letters.charCodeAt(i) % 7;
-      tone({ freq: (220 + code * 28) * pitch, type: 'triangle', dur: 0.06, vol: 0.06, delay: i * 0.032 });
+      tone({ freq: (220 + code * 28) * pitch * pitchMul, type: 'triangle', dur: 0.06, vol: 0.06, delay: i * 0.032 });
     }
   },
   click() { tone({ freq: 700, type: 'triangle', dur: 0.05, vol: 0.12 }); },
@@ -114,6 +122,8 @@ export const sfx = {
 const SONGS = {
   clinic: { bpm: 92, wave: 'triangle', vol: 0.5, bass: [48, 48, 53, 53, 50, 50, 55, 55], lead: [72, null, 76, 74, 72, null, 69, null, 71, null, 74, 72, 71, null, 67, null, 69, null, 72, 71, 69, null, 65, null, 67, 69, 71, 72, 74, null, null, null] },
   chase: { bpm: 168, wave: 'square', vol: 0.32, bass: [45, 45, 57, 45, 48, 48, 60, 48, 43, 43, 55, 43, 40, 40, 52, 44], lead: [69, 72, 76, 72, 69, 72, 76, 79, 77, 76, 74, 72, 71, 72, 74, 76, 72, 76, 79, 76, 72, 76, 79, 84, 83, 81, 79, 77, 76, 74, 72, 71] },
+  // the clinic song, but more confident
+  secret: { bpm: 132, wave: 'square', vol: 0.34, bass: [48, 60, 53, 65, 50, 62, 55, 67], lead: [77, 79, 81, 79, 77, null, 74, 76, 76, 77, 79, 77, 76, null, 72, 74, 74, 76, 77, 76, 74, null, 70, 72, 72, 74, 76, 77, 79, 81, 84, null] },
   surgery: { bpm: 76, wave: 'sine', vol: 0.5, bass: [45, null, 45, null, 41, null, 41, null], lead: [69, null, null, 72, null, null, 71, null, 68, null, null, 71, null, null, 69, null] },
 };
 let musicTimer = null;

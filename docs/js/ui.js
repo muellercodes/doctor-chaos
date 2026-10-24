@@ -30,7 +30,7 @@ export const TOOLS = [
 const NURSE_SVG = '<svg viewBox="0 0 64 64"><circle cx="32" cy="36" r="20" fill="#c68642"/><path d="M12 34 q0 -22 20 -22 q20 0 20 22 q-4 -12 -20 -12 q-16 0 -20 12z" fill="#2b1d14"/><path d="M16 18 q16 -12 32 0 l-2 6 q-14 -8 -28 0z" fill="#fff" stroke="#1d2b36" stroke-width="2"/><rect x="29" y="12" width="6" height="10" fill="#ff4d5e"/><rect x="27" y="14" width="10" height="6" fill="#ff4d5e"/><circle cx="25" cy="37" r="2.6" fill="#1d2b36"/><circle cx="39" cy="37" r="2.6" fill="#1d2b36"/><path d="M26 45 q6 5 12 0" stroke="#1d2b36" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M21 32 l7 -1.5 M43 32 l-7 -1.5" stroke="#1d2b36" stroke-width="2" stroke-linecap="round"/></svg>';
 
 export function createUI(root, E) {
-  const ui = {};
+  const ui = { talk: { speed: 1, hold: 1 } };
   const layer = (cls) => { const el = h('div', cls); root.appendChild(el); return el; };
 
   // ---------- HUD ----------
@@ -40,9 +40,12 @@ export function createUI(root, E) {
   muteBtn.title = 'Sound on/off';
   muteBtn.onclick = () => { muteBtn.blur(); sfx.setMuted(!sfx.muted); muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; ui.onMute && ui.onMute(sfx.muted); };
   const fsBtn = h('button', 'icon-btn interactive', '⛶');
-  fsBtn.title = 'Fullscreen';
-  fsBtn.onclick = () => { fsBtn.blur(); try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) { /* ignore */ } };
-  hud.append(hudDay, hudPat, hudMoney, h('div', 'spacer'), muteBtn, fsBtn);
+  fsBtn.title = 'Full screen';
+  fsBtn.onclick = () => { fsBtn.blur(); if (ui.onFullscreen) { ui.onFullscreen(); return; } try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) { /* ignore */ } };
+  const gearBtn = h('button', 'icon-btn interactive', '⚙️');
+  gearBtn.title = 'Settings';
+  gearBtn.onclick = () => { gearBtn.blur(); sfx.click(); ui.onGear && ui.onGear(); };
+  hud.append(hudDay, hudPat, hudMoney, h('div', 'spacer'), muteBtn, fsBtn, gearBtn);
   ui.syncMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; };
   ui.showHUD = v => hud.classList.toggle('hidden', !v);
   let shownMoney = null;
@@ -94,7 +97,7 @@ export function createUI(root, E) {
     live.add(b);
     if (o.pitch !== 0 && !o.silent) sfx.babble(text, o.pitch || 1);
     let i = 0;
-    const speed = o.fast ? 90 : 55;
+    const speed = (o.fast ? 90 : 55) * ui.talk.speed;
     return new Promise(res => {
       const total = text.length;
       const iv = setInterval(() => {
@@ -102,7 +105,7 @@ export function createUI(root, E) {
         tx.textContent = text.slice(0, i);
         if (i >= total) {
           clearInterval(iv);
-          const hold = o.hold !== undefined ? o.hold : 1.2 + total * 0.035;
+          const hold = (o.hold !== undefined ? o.hold : 1.2 + total * 0.035) * ui.talk.hold;
           if (o.persist) { res(b); return; }
           setTimeout(() => { b.kill(); res(b); }, hold * 1000);
         }
@@ -260,6 +263,7 @@ export function createUI(root, E) {
   const seen = new Set();
   ui.loadSeen = arr => { (arr || []).forEach(x => seen.add(x)); };
   ui.seenList = () => [...seen];
+  ui.resetSeen = () => { seen.clear(); ui.onSeen && ui.onSeen(); };
   ui.howTo = async (id, title, lines, icon = '') => {
     if (seen.has(id)) return false;
     seen.add(id);

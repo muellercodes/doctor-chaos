@@ -25,10 +25,28 @@ export async function play(G, P) {
   await E.frame(center, 0.65 * s, 0.45 * s, new THREE.Vector3(0, 0.35, 1), 0.8);
   const diff = G.tutorial ? 0 : G.diff;
   const ringR = 0.032 * s * G.tol;
-  const ham = hammer(); ham.scale.setScalar(s * 0.95); S.add(ham);
+  // The hammer hangs from a pivot at the doctor's hand. When it strikes, the head lands exactly on the aim dot.
+  const HS = s * 0.95, L = 0.26 * HS, STRIKE = -0.6;
+  const pivot = new THREE.Group(); S.add(pivot);
+  const ham = hammer(); ham.scale.setScalar(HS); ham.position.y = -L; pivot.add(ham);
+  ham.traverse(o => { if (o.isMesh) o.renderOrder = 6; });
   const aimDot = new THREE.Mesh(new THREE.RingGeometry(0.006 * s, 0.01 * s, 20), new THREE.MeshBasicMaterial({ color: '#1d2b36', depthTest: false })); aimDot.material.userData.dispose = true; aimDot.renderOrder = 5; S.add(aimDot);
-  const fidget = P.c.ageGroup === 'kid' ? 0.18 : 0.08;
-  let penalty = 0, mega = 0, fidgetOn = true;
+  const handOff = new THREE.Vector3(-Math.sin(STRIKE) * L, Math.cos(STRIKE) * L, 0); // hand relative to head at strike angle
+  const placeHammer = (pt, angle) => {
+    // pull the strike point toward the camera so the head sits in front of the knee but over the dot on screen
+    const toCam = E.camera.position.clone().sub(pt).normalize().multiplyScalar(0.045 * s);
+    const head = pt.clone().add(toCam);
+    pivot.position.copy(head).add(handOff);
+    pivot.rotation.set(0, 0, angle);
+  };
+  const fidget = P.c.ageGroup === 'kid' ? 0.15 : 0.07;
+  let penalty = 0, mega = 0, fidgetOn = true, missRow = 0;
+  const ringPoint = knee => person.wp(knee, 0, -0.07, 0.066);
+  const ringPx = kp => {
+    const right = new THREE.Vector3().setFromMatrixColumn(E.camera.matrixWorld, 0);
+    const a = E.toScreen(kp), b = E.toScreen(kp.clone().addScaledVector(right, ringR));
+    return { x: a.x, y: a.y, r: Math.hypot(b.x - a.x, b.y - a.y) };
+  };
   const order = ['R', 'L'];
   for (const side of order) {
     const knee = person.j['kn' + side];
@@ -45,18 +63,24 @@ export async function play(G, P) {
     let attempts = 0, done = false;
     while (!done) {
       const powM = ui.meter({ label: 'Power', marker: true, zones: [{ from: 0, to: 0.45, color: '#d9e2ec' }, { from: 0.45, to: 0.76, color: '#7be495' }, { from: 0.76, to: 1, color: '#ff8b8b' }] });
-      let charging = false, released = null, pw = 0, ph = 0;
-      G.dbg = { kind: 'reflex', knee: () => person.wp(knee, 0, -0.07, 0.066), pw: () => pw, charging: () => charging };
+      let charging = false, released = null, pw = 0, ph = 0, aimPt = null, hitInfo = null;
+      G.dbg = { kind: 'reflex', knee: () => ringPoint(knee), pw: () => pw, charging: () => charging };
       await new Promise(res => {
         const offD = () => { charging = true; ph = 0; };
-        const offU = () => { if (charging) { charging = false; released = pw; } };
+        const offU = () => {
+          if (!charging) return;
+          charging = false; released = pw;
+          // judge right now, from what the player sees on screen
+          const kp = ringPoint(knee), rp = ringPx(kp);
+          hitInfo = { kp, d: Math.hypot(E.input.cx - rp.x, E.input.cy - rp.y) / Math.max(1, rp.r) };
+        };
         E.input.listeners.down.add(offD); E.input.listeners.up.add(offU);
         const off = S.update(dt => {
-          const kp = person.wp(knee, 0, -0.07, 0.066);
-          const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -(kp.z + 0.04 * s));
+          const kp = ringPoint(knee);
+          const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -(kp.z + 0.004 * s));
           const p = E.pointerOnPlane(plane);
-          if (p) { aimDot.position.copy(p); ham.position.copy(p).add(new THREE.Vector3(0.03 * s, 0.035 * s, 0.02 * s)); }
-          ham.rotation.set(0.2, 0.3, -0.6 - (charging ? pw * 0.9 : 0));
+          if (p) { aimDot.position.copy(p); aimPt = p.clone(); }
+          if (aimPt) placeHammer(aimPt, STRIKE - 0.35 - (charging ? pw * 0.9 : 0));
           if (charging) { ph += dt * (1.25 + diff * 0.8); pw = 1 - Math.abs(1 - (ph % 2)); }
           powM.set(pw);
           if (released !== null) { E.input.listeners.down.delete(offD); E.input.listeners.up.delete(offU); off(); res(); }
@@ -65,29 +89,35 @@ export async function play(G, P) {
       });
       powM.remove();
       attempts++;
-      const kp = person.wp(knee, 0, -0.07, 0.066);
-      const hp = ham.position;
-      const dist = Math.hypot(hp.x - kp.x, hp.y - kp.y);
-      // swing
-      const r0 = ham.rotation.z;
-      await E.tween(0.09, k => { ham.rotation.z = r0 + 1.1 * k; });
+      const kp = hitInfo.kp;
+      const hit = hitInfo.d < 1.7;
+      // swing: the head comes down onto the dot
+      fidgetOn = false;
+      const a0 = pivot.rotation.z;
+      await E.tween(0.09, k => { placeHammer(aimPt, a0 + (STRIKE - a0) * k); });
       sfx.thud();
-      await E.tween(0.12, k => { ham.rotation.z = r0 + 1.1 * (1 - k); });
-      if (dist > ringR * 1.6) {
+      await E.tween(0.14, k => { placeHammer(aimPt, STRIKE - 0.35 * k); });
+      if (!hit) {
+        missRow++; if (missRow >= 3 && G.ach) G.ach('hammer_time');
         penalty += 12; sfx.ouch(P.c.voice || 1); person.expr('ouch'); G.mood(-8);
         G.say(pick(MISS), { key: 'c', hold: 0.9 });
         setTimeout(() => person.expr('smile'), 700);
+        fidgetOn = true;
       } else if (released < 0.45) {
+        missRow = 0;
         penalty += 6;
         G.say(pick(WEAK), { key: 'c', hold: 0.9 });
+        fidgetOn = true;
       } else {
-        fidgetOn = false;
         const megaKick = released > 0.76;
         const kick = megaKick ? -1.55 : -1.05;
         sfx.boing();
         person.poseSpeed = 9;
-        await E.tween(0.12, k => { person.off['kn' + side][0] = kick * k; }, t => t);
+        const k0 = person.off['kn' + side][0];
+        await E.tween(0.12, k => { person.off['kn' + side][0] = k0 + (kick - k0) * k; }, t => t);
+        missRow = 0;
         if (megaKick) {
+          if (G.ach) G.ach('kicked');
           mega++; penalty += 22;
           E.shake(0.06); ui.flash('rgba(255,255,255,0.8)'); sfx.thud();
           ui.popCenter('OOF! 💫', 'bad');

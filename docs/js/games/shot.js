@@ -6,6 +6,7 @@ export async function armSetup(G, P, side = 'R', focus = 'upper') {
   const { E } = G;
   const person = P.person;
   person.setPose(side === 'R' ? 'armOutR' : 'armOutL');
+  if (person.rollUp) person.rollUp(side, focus === 'upper' ? 'upper' : 'lower');
   await E.wait(0.45);
   person.snap();
   const a = person.armInfo(side);

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { createEngine, clamp, rand, pick, shuffle, TABLE_TOP } from './engine.js';
 import { buildRoom } from './room.js';
-import { Person, Baby } from './person.js';
+import { Person, Baby, FLAGS } from './person.js';
+import * as M from './meta.js';
 import { createUI, h } from './ui.js';
 import { sfx, music } from './audio.js';
 import * as D from './data.js';
@@ -28,11 +29,11 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 
 // ---------------- save ----------------
 const SAVE_KEY = 'doctor-chaos-save-v1';
-const fresh = () => ({ v: 1, day: 1, money: 200, upgrades: { steady: 0, lawyer: 0, shoes: 0, lolli: 0, coats: 0 }, coat: '#ffffff', tutorialDone: false, seen: [], muted: false, usedExcuses: [], nextSpecialDay: null, specialBag: [], personaBag: [], lastSpecial: null, plan: null, stats: { patients: 0, threeStars: 0, lawsuits: 0, paidOut: 0, bestDay: 0 } });
+const fresh = () => ({ v: 1, day: 1, money: 200, upgrades: { steady: 0, lawyer: 0, shoes: 0, lolli: 0, coats: 0 }, coat: '#ffffff', tutorialDone: false, seen: [], muted: false, usedExcuses: [], nextSpecialDay: null, specialBag: [], personaBag: [], lastSpecial: null, plan: null, dayRun: null, savedAt: 0, stats: { patients: 0, threeStars: 0, lawsuits: 0, paidOut: 0, bestDay: 0 } });
 function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.v === 1) return { ...fresh(), ...s, upgrades: { ...fresh().upgrades, ...s.upgrades }, stats: { ...fresh().stats, ...s.stats } }; } catch (e) { /* ignore */ } return null; }
 let state = loadSave() || fresh();
 const hadSave = !!loadSave();
-function writeSave() { try { state.seen = ui.seenList(); state.muted = sfx.muted; localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
+function writeSave() { try { state.seen = ui.seenList(); state.muted = sfx.muted; state.savedAt = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } M.queueSync(); }
 
 // ---------------- setup ----------------
 const canvas = document.getElementById('gl');
@@ -42,9 +43,29 @@ const ui = createUI(document.getElementById('ui'), E);
 ui.loadSeen(state.seen);
 ui.onSeen = () => writeSave();
 sfx.setMuted(!!state.muted); ui.syncMute();
-ui.onMute = m => { state.muted = m; writeSave(); if (m) music.stop(); else music.play('clinic'); };
+let muteFlips = [];
+ui.onMute = m => {
+  state.muted = m; writeSave(); if (m) music.stop(); else music.play('clinic');
+  const now = Date.now(); muteFlips = muteFlips.filter(t => now - t < 20000); muteFlips.push(now);
+  if (muteFlips.length >= 20) M.unlock('sound_toggle');
+};
+ui.onFullscreen = () => M.goFullscreen();
+ui.onGear = async () => { E.paused = true; await M.openSettings(); E.paused = false; };
 
-E.onUpdate(dt => { R.monitor.update(dt); R.updateClock(); });
+E.onUpdate(dt => { R.monitor.update(dt); if (!clockSpin) R.updateClock(); });
+let clockSpin = false;
+const LIGHT0 = { hemi: R.hemi.intensity, hemiC: R.hemi.color.clone(), sun: R.sun.intensity };
+function applyGameSettings(st) {
+  ui.talk.speed = { slow: 0.6, normal: 1, fast: 1.7 }[st.talk] || 1;
+  ui.talk.hold = { slow: 1.6, normal: 1, fast: 0.75 }[st.talk] || 1;
+  E.setQuality(st.quality === 'fast');
+  E.noShake = !st.shake;
+  const ch = st.cheats || {};
+  FLAGS.bighead = !!ch.bighead; FLAGS.party = !!ch.party; FLAGS.zoomies = !!ch.zoomies;
+  sfx.pitch = ch.squeaky ? 1.8 : 1;
+  if (ch.spooky) { R.hemi.color.set('#b18cff'); R.hemi.intensity = LIGHT0.hemi * 0.6; R.sun.intensity = LIGHT0.sun * 0.35; }
+  else { R.hemi.color.copy(LIGHT0.hemiC); R.hemi.intensity = LIGHT0.hemi; R.sun.intensity = LIGHT0.sun; }
+}
 
 // nurse NPC
 const nurse = new Person({ age: 'adult', gender: 'f', skin: '#c68642', hair: { style: 'bun', color: '#2b1d14' }, shirt: '#b8a1e3', pants: '#9d84d1', shoes: '#ffffff', outfit: 'scrubs', sleeves: 'short' });
@@ -70,8 +91,10 @@ const G = {
   howTo: (id, title, lines, icon) => ui.howTo(id, title, lines, icon),
   addMoney(n) { state.money += n; ui.setHUD({ money: state.money }); },
   mood(d) { if (G.cur) G.cur.mood = clamp(G.cur.mood + d, 0, 100); },
+  ach: id => M.unlock(id),
   remark() {
     const P = G.cur; if (!P || !P.c.remarks || !P.c.remarks.length) return;
+    if (Math.random() < 0.05 && P.c.personality !== 'mime' && !(P.person instanceof Baby)) { G.say(pick(D.PICKLES_LINES), { key: 'remark', hold: 2.2 }); return; }
     P.remarkPool = P.remarkPool && P.remarkPool.length ? P.remarkPool : [...P.c.remarks].sort(() => Math.random() - 0.5);
     G.say(P.remarkPool.pop(), { key: 'remark', hold: 1.6 });
   },
@@ -88,6 +111,14 @@ const G = {
 window.__G = G;
 window.__D = D;
 window.__state = () => state;
+M.initMeta({
+  addMoney: n => { state.money += n; ui.setHUD({ money: state.money }); writeSave(); M.checkState(state); },
+  getState: () => state,
+  loadState: st => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(st)); } catch (e) { /* ignore */ } location.reload(); },
+  resetTips: () => ui.resetSeen(),
+  specialTypes: D.SPECIAL_TYPES,
+  applySettings: applyGameSettings,
+});
 
 // ---------------- helpers ----------------
 function disposeObj(o) { o.traverse(x => { if (x.geometry) x.geometry.dispose(); }); }
@@ -142,9 +173,10 @@ async function enterPatient(P) {
   }
 }
 
-async function exitPatient(P) {
+async function exitPatient(P, stars = 2) {
   const { person, parent } = P;
   await E.home(0.5);
+  if (!parent && person.root.visible && P.c.special !== 'triplets') G.say(pick(stars >= 2 ? D.BYE.happy : D.BYE.sad), { key: 'c', hold: 0.6 });
   if (parent) {
     sfx.pop();
     await E.tween(0.25, k => person.root.scale.setScalar(Math.max(0.01, 1 - k)));
@@ -262,6 +294,46 @@ function lawsuitAmount(sev) {
   return { raw: Math.round(raw / 10) * 10, final: Math.round(cut / 10) * 10 };
 }
 
+// Leave the tool tray open for two minutes and the patient grows a beard.
+function coffeeBreak(P) {
+  if (G.cur !== P || !(P.person instanceof Person)) return;
+  M.unlock('coffee');
+  const hp = P.person.j.head;
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), new THREE.MeshToonMaterial({ color: (P.c.look.hair && P.c.look.hair.color) || '#3b2a20' }));
+  b.scale.set(1.05, 0.95, 0.6); b.position.set(0, 0.05, 0.08); hp.add(b);
+  sfx.pop();
+  G.say(pick(["I've been waiting so long I grew a beard.", 'Is the doctor... still here? I have aged.', 'I came in for a checkup. Now I have a beard. Thanks.']), { key: 'c', hold: 1.6 });
+}
+
+// Poking things in the room while picking a tool.
+const pokes = { nurse: 0, clock: 0, plant: 0 };
+E.input.listeners.down.add(async () => {
+  if (!G.dbg || G.dbg.kind !== 'tool' || M.isPanelOpen()) return;
+  const hit = E.pickObjects([nurse.root, R.clock, R.plant]);
+  if (!hit) return;
+  let o = hit.object; while (o && o !== nurse.root && o !== R.clock && o !== R.plant) o = o.parent;
+  if (o === nurse.root) {
+    const n = ++pokes.nurse;
+    nurse.wiggle = 0.4; sfx.boing && sfx.boing();
+    if (n === 5) { M.unlock('nurse_poke'); nurseSay("Okay. OKAY. You want a secret? Type PARTY in the secret code box in Settings. Now stop poking me.", { hold: 2.5 }); }
+    else nurseSay(pick(['Yes?', 'Can I help you, Doctor?', 'Please pick a tool.', 'I am working.', 'Poking the nurse is not a medical procedure.', 'Doctor.']), { hold: 1 });
+  } else if (o === R.clock) {
+    const n = ++pokes.clock;
+    sfx.click();
+    if (n === 8) {
+      M.unlock('clock'); clockSpin = true;
+      const hands = R.clock.children.slice(-2);
+      await E.tween(1.6, k => { hands[0].rotation.z = k * 30; hands[1].rotation.z = -k * 12; });
+      clockSpin = false; pokes.clock = 0;
+      nurseSay('Stop touching the clock. Time is fragile.', { hold: 1.6 });
+    }
+  } else if (o === R.plant) {
+    const n = ++pokes.plant;
+    sfx.ahh && sfx.ahh(1.6);
+    if (n === 5) { M.unlock('plant'); pokes.plant = 0; nurseSay('The plant says thank you. The plant has been very lonely.', { hold: 1.6 }); }
+  }
+});
+
 // ---------------- one patient ----------------
 async function runPatient(c, idx, total, hooks = {}) {
   ui.setHUD({ patient: `Patient ${idx + 1}/${total}` });
@@ -282,6 +354,7 @@ async function runPatient(c, idx, total, hooks = {}) {
   const offU = E.onUpdate((dt, t) => { for (const a of actors) a.update(dt, t); });
   const P = { person, parent, extras, c, mood: 70 + 5 * (state.upgrades.lolli || 0) };
   G.cur = P;
+  if (c.special) M.metSpecial(c.special);
   await enterPatient(P);
   const showNote = G.tutorial || state.day <= 2;
   if (c.special !== 'baby') {
@@ -298,9 +371,13 @@ async function runPatient(c, idx, total, hooks = {}) {
     G.stepTool = tool; G.dbg = { kind: 'tool' };
     if (hooks.beforeTool) await hooks.beforeTool(step, i);
     while (true) {
+      const coffee = setTimeout(() => coffeeBreak(P), 120000);
+      const bored = setTimeout(() => { if (G.cur === P && c.special !== 'baby') G.say(pick(D.IMPATIENT[c.ageGroup] || D.IMPATIENT.adult), { key: 'c', hold: 1.2 }); }, 25000);
       const t = await ui.pickTool({ title: c.steps.length > 1 ? `Problem ${i + 1} of ${c.steps.length}: pick a tool` : 'Pick the right tool', highlight: G.tutorial ? tool : null });
+      clearTimeout(coffee); clearTimeout(bored);
       if (t === tool) break;
       wrong++; ui.shakeTray(); sfx.bad(); G.mood(-8);
+      if (wrong >= 5) M.unlock('wrong_tools');
       person.expr('angry');
       if (c.special === 'baby') nurseSay(pick(['That is not for babies, Doctor.', 'The baby is judging you. I am also judging you.']), { hold: 1 });
       else G.say(pick(D.WRONG_TOOL[t]), { key: 'c', hold: 1 });
@@ -309,28 +386,32 @@ async function runPatient(c, idx, total, hooks = {}) {
     }
     ui.hideTray(); ui.hideChart(); ui.clearBubbles();
     person.expr('smile');
-    if (c.special !== 'baby' && !G.tutorial && i === 0 && Math.random() < 0.35 && !c.special) { G.remark(); await E.wait(1.2); }
+    if (c.special !== 'baby' && !G.tutorial && !c.special && Math.random() < (i === 0 ? 0.45 : 0.25)) { G.remark(); await E.wait(1.2); }
     if (hooks.beforeGame) await hooks.beforeGame(step, i);
     // special pre-events
     if (c.special === 'runner' && !extra) {
       extra = await runnerSequence(P);
+      M.unlock(extra.caught ? 'caught_runner' : 'escaped');
       if (!extra.caught) { results.push({ score: 0, fail: true, severity: 1, reason: 'chase', step }); break; }
     }
     if (c.special === 'hider' && !extra) {
       person.expr('scared');
       await G.say(pick(['NOPE!', "Nuh-uh! You can't shot what you can't FIND!", 'Is that a needle?! BYE!']), { key: 'c', hold: 0.3 });
       extra = await hide.play(G, P);
+      M.unlock('hider_found');
     }
     if (c.special === 'sneezy' && !extra) extra = await sneeze.play(G, P);
     if (c.special === 'scooter' && !extra) {
       extra = await scooterSequence(P);
+      M.unlock(extra.caught ? 'caught_scooter' : 'escaped');
       if (!extra.caught) { results.push({ score: 0, fail: true, severity: 1, reason: 'scooter', step }); break; }
     }
-    if (c.special === 'germs' && !extra) extra = await germsSequence(P);
-    if (c.special === 'lightsout' && !extra) extra = await lightsOutSequence(P);
+    if (c.special === 'germs' && !extra) { extra = await germsSequence(P); if (extra.boss) M.unlock('germ_king'); }
+    if (c.special === 'lightsout' && !extra) { extra = await lightsOutSequence(P); if (extra.found) M.unlock('lights_found'); }
     if (c.special === 'triplets' && !extra) {
       extra = await triplets.play(G, P);
       person = P.person;
+      if (!extra.fail && extra.score >= 100) M.unlock('triplets_first');
       if (extra.fail) { results.push({ ...extra, step }); break; }
     }
     let res;
@@ -359,6 +440,10 @@ async function runPatient(c, idx, total, hooks = {}) {
   const tip = !fail && stars === 3 && P.mood > 55 ? Math.round(c.basePay * (0.15 + 0.05 * (state.upgrades.lolli || 0))) : 0;
   const escaped = extra && extra.caught === false;
   person = P.person;
+  if (stars === 3) M.unlock('three_stars');
+  if (tip) M.bump('tips');
+  if (!fail && c.special === 'baby') M.unlock('baby_calm');
+  if (!fail && c.personality === 'vampire' && results.some(r => r.step === 'blood')) M.unlock('vampire_blood');
   // reaction
   if (!escaped) {
     if (fail) { person.expr(c.special === 'baby' ? 'cry' : 'angry'); if (c.special === 'baby') await ui.say(() => parent.headTop(), pick(['My lawyer will be calling.', 'We are LEAVING.']), { name: c.parent.title, key: 'parent', hold: 1 }); else await G.say(c.fail || pick(D.FAIL), { key: 'c', hold: 0.8 }); }
@@ -391,16 +476,19 @@ async function runPatient(c, idx, total, hooks = {}) {
       html: `<div class="case">${plaintiff} <i>v.</i> Doctor Chaos</div>
         <div class="severity sev${severity}">${['', 'Small Claims', 'Serious Lawsuit', 'MEGA LAWSUIT'][severity] || 'Lawsuit'}</div>
         <div class="claim">“${txt}”</div>
-        <div class="damages">Damages: <b>${fmt(amt.final)}</b>${amt.final < amt.raw ? `<small>Your lawyer got it down from ${fmt(amt.raw)}.</small>` : ''}</div>`,
+        <div class="damages">Damages: <b>${fmt(amt.final)}</b>${amt.final < amt.raw ? `<small>Your lawyer got it down from ${fmt(amt.raw)}.</small>` : ''}</div>
+        <div class="fine-print">Case No. ${Math.floor(rand(100000, 999999))}. Clerk's note: the courthouse vending machine code is SNACK. Please stop asking.</div>`,
       buttons: [{ label: 'Pay up 😬', value: true }],
     });
     G.addMoney(-amt.final);
     sfx.coin();
     state.stats.lawsuits++; state.stats.paidOut += amt.final;
+    if (severity >= 3) M.unlock('mega_lawsuit');
   }
   state.stats.patients++;
   if (stars === 3) state.stats.threeStars++;
-  if (!escaped) await exitPatient(P);
+  M.checkState(state);
+  if (!escaped) await exitPatient(P, stars);
   offU();
   for (const a of actors) { E.scene.remove(a.root); disposeObj(a.root); }
   G.cur = null;
@@ -431,6 +519,7 @@ async function runTutorial() {
   await nursePanel('Some patients are... <b>special</b>. Runners. Hiders. Sneezers. Babies. You will see. Oh, you will see.');
   await nursePanel("Spend your money on <b>upgrades</b> at the end of each day. Ready? Let's open the clinic!", { button: "Let's go!" });
   state.tutorialDone = true;
+  M.unlock('orientation');
   writeSave();
 }
 
@@ -461,27 +550,54 @@ function planDay(day) {
 
 window.__planDay = d => planDay(d);
 
+function dayLine(day) {
+  const hr = new Date().getHours();
+  if (hr >= 0 && hr < 4) return 'It is the middle of the night. Even the patients are yawning. Nurse Pat is wearing pajamas under her scrubs.';
+  if (day === 13) return 'Day 13. Nurse Pat brought a black cat for luck. It is wearing a tiny lab coat. It has already bitten someone.';
+  if (day === 42) return 'Day 42. The answer to everything. Except medicine. You still have to do the medicine.';
+  if (day === 100) return 'Day 100! The hospital board sent a card. It says "Wow. Still here?"';
+  return pick(D.FORECAST);
+}
+
 async function playDay() {
   G.tutorial = false;
   const day = state.day;
   ui.showHUD(true);
   ui.setHUD({ day, money: state.money, patient: '' });
-  const plan = planDay(day);
-  const used = new Set(state.usedExcuses || []);
-  const list = D.generateDay(day, { used, special: plan.special, persona: plan.persona });
-  state.usedExcuses = [...used];
-  writeSave();
-  await E.home(0.6);
-  await ui.card({
-    icon: '🏥',
-    title: `Day ${day}`,
-    html: `<p><b>${WEEKDAYS[(day - 1) % 7]}.</b> ${list.length} patients in the waiting room.</p><p class="muted">${pick(D.FORECAST)}</p>`,
-    buttons: [{ label: 'Open the clinic!', value: true }],
-  });
-  const startMoney = state.money;
-  const out = [];
-  for (let i = 0; i < list.length; i++) out.push(await runPatient(list[i], i, list.length));
-  await endOfDay(out, startMoney);
+  // Resume a day that was left part way through, at the next patient.
+  let run = state.dayRun && state.dayRun.day === day && Array.isArray(state.dayRun.list) && state.dayRun.idx < state.dayRun.list.length ? state.dayRun : null;
+  if (!run) {
+    const plan = planDay(day);
+    const used = new Set(state.usedExcuses || []);
+    const list = D.generateDay(day, { used, special: plan.special, persona: plan.persona });
+    state.usedExcuses = [...used];
+    run = state.dayRun = { day, list: JSON.parse(JSON.stringify(list)), idx: 0, out: [], startMoney: state.money };
+    writeSave();
+    await E.home(0.6);
+    await ui.card({
+      icon: '🏥',
+      title: `Day ${day}`,
+      html: `<p><b>${WEEKDAYS[(day - 1) % 7]}.</b> ${list.length} patients in the waiting room.</p><p class="muted">${dayLine(day)}</p>`,
+      buttons: [{ label: 'Open the clinic!', value: true }],
+    });
+  } else {
+    await E.home(0.6);
+    await ui.card({
+      icon: '🏥',
+      title: `Welcome back!`,
+      html: `<p>Day ${day}, patient ${run.idx + 1} of ${run.list.length} is still waiting.</p><p class="muted">${pick(D.WELCOME_BACK)}</p>`,
+      buttons: [{ label: 'Next patient!', value: true }],
+    });
+  }
+  while (run.idx < run.list.length) {
+    const r = await runPatient(run.list[run.idx], run.idx, run.list.length);
+    run.out.push({ name: r.c.name, stars: r.stars, pay: r.pay, lawsuit: r.lawsuit ? { amount: r.lawsuit.amount } : null, review: r.review, fail: r.fail });
+    run.idx++;
+    G.onPatientDone && G.onPatientDone(r);
+    writeSave();
+  }
+  state.dayRun = null;
+  await endOfDay(run.out, run.startMoney);
 }
 
 async function endOfDay(out, startMoney) {
@@ -489,8 +605,11 @@ async function endOfDay(out, startMoney) {
   const earned = out.reduce((a, r) => a + r.pay, 0);
   const sued = out.reduce((a, r) => a + (r.lawsuit ? r.lawsuit.amount : 0), 0);
   const starsTotal = out.reduce((a, r) => a + r.stars, 0);
+  M.bump('days');
+  if (starsTotal >= 15) M.unlock('perfect_day');
+  if (starsTotal === 0) M.unlock('zero_day');
   state.stats.bestDay = Math.max(state.stats.bestDay, earned - sued);
-  const rows = out.map(r => `<tr><td>${r.c.name}</td><td class="st">${'★'.repeat(r.stars)}<span class="off">${'★'.repeat(3 - r.stars)}</span></td><td class="pos">${r.pay ? '+' + fmt(r.pay) : ''}</td><td class="neg">${r.lawsuit ? '−' + fmt(r.lawsuit.amount) : ''}</td></tr>`).join('');
+  const rows = out.map(r => `<tr><td>${r.name}</td><td class="st">${'★'.repeat(r.stars)}<span class="off">${'★'.repeat(3 - r.stars)}</span></td><td class="pos">${r.pay ? '+' + fmt(r.pay) : ''}</td><td class="neg">${r.lawsuit ? '−' + fmt(r.lawsuit.amount) : ''}</td></tr>`).join('');
   const goodReview = out.filter(r => r.stars >= 2).map(r => r.review)[0];
   const badReview = out.filter(r => r.stars <= 1).map(r => r.review)[0];
   sfx.fanfare();
@@ -506,8 +625,11 @@ async function endOfDay(out, startMoney) {
   });
   state.day++;
   writeSave();
+  M.checkState(state);
+  M.queueSync(true);
   if (state.money < -1000) {
     sfx.bad();
+    M.unlock('bankrupt');
     const v = await ui.card({
       icon: '🥫',
       title: 'BANKRUPT!',
@@ -527,6 +649,7 @@ const UPGRADES = [
   { id: 'lolli', name: 'Lollipop Jar', icon: '🍭', desc: 'Babies calm down faster. Happy patients tip more.', costs: [150, 300, 600] },
 ];
 const COATS = ['#ffffff', '#ff8a2a', '#3a86ff', '#ff5d8f', '#2ec4b6', '#1d2b36', '#9b5de5'];
+const coatList = () => M.profile.secrets.konami ? [...COATS, '#d4af37'] : COATS;
 
 function shop() {
   return new Promise(res => {
@@ -545,7 +668,7 @@ function shop() {
         row.innerHTML = `<div class="shop-icon">${u.icon}</div><div class="shop-info"><b>${u.name}</b><span>${u.desc}</span><div class="dots">${[0, 1, 2].map(i => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div></div>`;
         const b = h('button', 'btn small ' + (cost !== undefined && state.money >= cost ? 'primary' : ''), cost === undefined ? 'MAX' : fmt(cost));
         b.disabled = cost === undefined || state.money < cost;
-        b.onclick = () => { state.money -= cost; state.upgrades[u.id] = lvl + 1; sfx.cash(); ui.setHUD({ money: state.money }); writeSave(); render(); };
+        b.onclick = () => { state.money -= cost; state.upgrades[u.id] = lvl + 1; sfx.cash(); ui.setHUD({ money: state.money }); writeSave(); M.checkState(state); render(); };
         row.appendChild(b);
         list.appendChild(row);
       }
@@ -558,8 +681,8 @@ function shop() {
         b.onclick = () => { state.money -= 100; state.upgrades.coats = 1; sfx.cash(); ui.setHUD({ money: state.money }); writeSave(); render(); };
         crow.appendChild(b);
       } else {
-        crow.innerHTML = `<div class="shop-icon">🥼</div><div class="shop-info"><b>Coat color</b><div class="swatches">${COATS.map(cc => `<button class="sw ${cc === state.coat ? 'on' : ''}" data-c="${cc}" style="background:${cc}"></button>`).join('')}</div></div>`;
-        crow.querySelectorAll('.sw').forEach(s => (s.onclick = () => { state.coat = s.dataset.c; sfx.click(); writeSave(); render(); }));
+        crow.innerHTML = `<div class="shop-icon">🥼</div><div class="shop-info"><b>Coat color</b><div class="swatches">${coatList().map(cc => `<button class="sw ${cc === state.coat ? 'on' : ''}" data-c="${cc}" style="background:${cc}"></button>`).join('')}</div></div>`;
+        crow.querySelectorAll('.sw').forEach(s => (s.onclick = () => { state.coat = s.dataset.c; sfx.click(); M.unlock('fashion'); writeSave(); render(); }));
       }
       list.appendChild(crow);
       card.appendChild(list);
@@ -599,19 +722,46 @@ function stopTitleScene() {
   if (demo) { E.scene.remove(demo.root); disposeObj(demo.root); demo = null; }
 }
 
+const TAGLINES = [
+  'Malpractice makes perfect.', 'Five patients a day. Zero medical degrees.', 'Now with 40% fewer lawsuits! (Not true.)',
+  'Ask your doctor if Doctor Chaos is right for you.', "We put the 'ow' in 'how are you feeling?'", 'Board certified by a board. It was a cutting board.',
+  'Side effects may include: everything.', 'Nurse Pat approved. Barely.', 'Please do not lick the stethoscope.',
+  'Our lawyers asked us to stop saying "trust me."', 'Free lollipop with every lawsuit.', 'Where every checkup is a check-uh-oh.',
+  'Not a real doctor. Not a real hospital. Real lawsuits.', 'Voted #1 clinic in this building.', 'Have you tried turning your arm off and on again?',
+  'Rated 5 stars by the vending machine.', 'Our cafeteria pudding has its own lawyer.', 'Proudly serving patients since about five minutes ago.',
+  'We have a 100% success rate at opening the door.', "If it's broken, we cast it. If it's not broken... we also cast it.", 'The doctor will see you now. Unfortunately.',
+  'Warning: contains Nurse Pat.', 'No refunds. No returns. No idea what we are doing.', 'Every patient leaves with a smile. Or a lawsuit. Usually both.',
+  'Professionally unprofessional.', 'The stethoscope is mostly for show.', 'Practice makes... malpractice.', 'Day 1 of being a doctor. Day 0 of medical school.',
+  'Stop running in the halls. Especially you, Gertrude.', 'Now with real fake medicine!', 'The X-ray machine is just a very strong flashlight.',
+  'Healthy patients are just patients we have not met yet.', 'Bring your own bandages.', 'Insurance? Never heard of her.',
+];
+
+function rainTacos(el, emoji = '🌮', n = 40) {
+  for (let i = 0; i < n; i++) {
+    const t = h('div', 'taco', emoji);
+    t.style.left = Math.random() * 100 + 'vw';
+    t.style.animationDelay = (Math.random() * 2.2) + 's';
+    t.style.fontSize = (28 + Math.random() * 30) + 'px';
+    el.appendChild(t);
+    setTimeout(() => t.remove(), 5200);
+  }
+}
+
 function showTitle() {
   return new Promise(res => {
     const el = document.getElementById('title');
     el.classList.remove('hidden');
     const btns = el.querySelector('.title-buttons');
     btns.innerHTML = '';
+    const cleanups = [];
     const add = (label, cls, fn) => { const b = h('button', 'btn ' + cls, label); b.onclick = () => { sfx.unlock(); sfx.click(); fn(); }; btns.appendChild(b); return b; };
-    const go = mode => { el.classList.add('hidden'); res(mode); };
+    const go = mode => { cleanups.forEach(f => f()); el.classList.add('hidden'); res(mode); };
+    const midDay = state.dayRun && state.dayRun.day === state.day && state.dayRun.idx > 0 ? `, patient ${state.dayRun.idx + 1}` : '';
     if (hadSave && state.tutorialDone) {
-      add(`Continue · Day ${state.day}`, 'primary big', () => go('continue'));
+      add(`Continue · Day ${state.day}${midDay}`, 'primary big', () => go('continue'));
       add('New game', '', async () => {
         el.classList.add('hidden');
-        const v = await ui.card({ title: 'Start over?', html: '<p>This erases your money, upgrades and days.</p>', buttons: [{ label: 'Cancel', value: false }, { label: 'Yes, start over', value: true }] });
+        const v = await ui.card({ title: 'Start over?', html: '<p>This erases your money, upgrades and days. Achievements stay.</p>', buttons: [{ label: 'Cancel', value: false }, { label: 'Yes, start over', value: true }] });
         if (v) { const keepSeen = state.seen; state = fresh(); state.seen = keepSeen; writeSave(); }
         el.classList.remove('hidden');
         if (v) { btns.innerHTML = ''; add('Start with tutorial', 'primary big', () => go('tutorial')); add('Skip tutorial', '', () => go('skip')); }
@@ -620,16 +770,114 @@ function showTitle() {
       add('Start your shift', 'primary big', () => go('tutorial'));
       add('Skip tutorial', '', () => go('skip'));
     }
+    // menu row
+    let menu = el.querySelector('.title-menu');
+    if (!menu) { menu = h('div', 'title-menu'); btns.after(menu); }
+    menu.innerHTML = '';
+    const mbtn = (icon, label, fn) => { const b = h('button', 'menu-btn', `<span>${icon}</span><small>${label}</small>`); b.onclick = () => { sfx.unlock(); sfx.click(); fn(); }; menu.appendChild(b); return b; };
+    mbtn('⚙️', 'Settings', () => M.openSettings());
+    mbtn('🏆', 'Awards', () => M.openAchievements());
+    mbtn('📊', 'Leaders', () => M.openLeaderboard());
+    const acctB = mbtn('👤', M.auth.username ? M.auth.username : 'Account', () => M.openAccount());
+    if (window.matchMedia('(pointer: coarse)').matches && !M.isFullscreen()) mbtn('⛶', 'Full screen', () => M.goFullscreen());
+    M.hooks.onAuth = a => { acctB.querySelector('small').textContent = a.username || 'Account'; };
+    // rotating taglines
+    const tag = el.querySelector('.tagline');
+    let ti = 0;
+    const order = shuffle(TAGLINES.slice(1)); order.unshift(TAGLINES[0]);
+    const nextTag = () => { ti = (ti + 1) % order.length; tag.classList.remove('flip'); void tag.offsetWidth; tag.classList.add('flip'); setTimeout(() => { tag.textContent = order[ti]; }, 180); };
+    tag.textContent = order[0];
+    const tagTimer = setInterval(nextTag, 5200);
+    cleanups.push(() => clearInterval(tagTimer));
+    // secret: hold the tagline for 3 seconds
+    let holdT = null;
+    tag.onpointerdown = () => { holdT = setTimeout(() => { holdT = null; tag.textContent = 'This tagline has been reviewed by zero doctors.'; tag.classList.add('fine'); M.unlock('fine_print'); sfx.ding(); setTimeout(() => tag.classList.remove('fine'), 4000); }, 3000); };
+    tag.onpointerup = tag.onpointerleave = () => { if (holdT) { clearTimeout(holdT); holdT = null; nextTag(); } };
+    // secret: spell words by tapping logo letters
+    let spelled = '';
+    el.querySelectorAll('.logo i').forEach(letter => {
+      letter.onclick = e => {
+        e.stopPropagation();
+        letter.classList.remove('boing'); void letter.offsetWidth; letter.classList.add('boing');
+        sfx.blip ? sfx.blip(0.8 + Math.random() * 0.6) : sfx.click();
+        spelled = (spelled + letter.textContent).slice(-8);
+        if (spelled.endsWith('TACOS')) { spelled = ''; rainTacos(el); M.unlock('tacos'); setTimeout(() => M.secret('tacos', { icon: '🌮', title: 'Taco Tuesday', html: '<p>It is raining tacos. This is not covered by insurance.</p>' }), 2600); }
+        if (spelled.endsWith('ROACH')) { spelled = ''; const r = h('div', 'roach', '🪳'); el.appendChild(r); setTimeout(() => r.remove(), 4200); M.unlock('roach'); sfx.giggle && sfx.giggle(0, 1.4); }
+      };
+    });
+    // secret: type on the keyboard (old cheat code, or the designer's name)
+    const KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+    let keys = [], typed = '';
+    const onKey = e => {
+      if (M.isPanelOpen() || /input|textarea/i.test(document.activeElement && document.activeElement.tagName)) return;
+      keys = [...keys, e.code].slice(-10);
+      if (keys.join() === KONAMI.join()) {
+        keys = [];
+        el.querySelector('.logo').classList.toggle('upside');
+        M.unlock('konami'); sfx.fanfare();
+        M.secret('konami', { icon: '🕹️', title: 'Cheat code detected!', html: '<p>Cheat codes are not allowed in medical school. You have been expelled.</p><p>Just kidding. Here is a <b>gold coat</b>. Find it in the upgrade shop.</p>' });
+      }
+      if (/^Key[A-Z]$/.test(e.code)) {
+        typed = (typed + e.code.slice(3)).slice(-10);
+        if (typed.endsWith('LINUS')) { typed = ''; M.unlock('linus'); M.secret('linus', { icon: '🧠', title: 'Hi, Linus!', html: '<p>You designed this whole game. That makes you Nurse Pat\'s boss now.</p><p class="muted">She says she is "thrilled." She is not thrilled.</p>' }); }
+        if (typed.endsWith('NURSEPAT')) { typed = ''; M.secret('pat', { icon: '👩‍⚕️', title: 'Nurse Pat', html: '<p>"You typed my name. I heard it. I hear everything."</p>' }); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    cleanups.push(() => window.removeEventListener('keydown', onKey));
+    // secret: tap the speaker in the credits 10 times
+    const spk = el.querySelector('.spk');
+    let spkN = 0;
+    if (spk) spk.onclick = e => {
+      e.stopPropagation(); spkN++;
+      spk.classList.remove('boing'); void spk.offsetWidth; spk.classList.add('boing');
+      if (spkN === 10) { spkN = 0; sfx.unlock(); music.play('secret'); M.unlock('secret_song'); M.secret('song', { icon: '🎵', title: 'The secret song', html: '<p>You found the secret song. It is the normal song, but more confident.</p><p class="muted">Hint for another secret: the logo is hungry.</p>' }); }
+    };
+    // secret: poke the patient behind the menu
+    let pokesDemo = 0;
+    const onTitleDown = e => {
+      if (e.target.closest('button, .logo i, .tagline, .spk, .credits')) return;
+      if (!demo) return;
+      E.input.x = (e.clientX / window.innerWidth) * 2 - 1; E.input.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      const hit = E.pickObjects([demo.root]);
+      if (!hit) return;
+      pokesDemo++; demo.wiggle = 0.4; demo.expr(pick(['surprised', 'angry', 'scared'])); sfx.boing && sfx.boing();
+      if (pokesDemo === 7) { M.unlock('poke_demo'); ui.say(() => demo.headTop(), "Can you NOT? I'm just here for the title screen.", { name: 'Title Screen Patient', key: 'demo', hold: 2 }); }
+    };
+    el.addEventListener('pointerdown', onTitleDown);
+    cleanups.push(() => el.removeEventListener('pointerdown', onTitleDown));
+    // secret: wait three minutes on the title screen
+    const idle = setTimeout(() => { if (demo) { demo.expr('sleep'); M.unlock('waiting'); tag.textContent = 'zzz... the patient fell asleep waiting for you... zzz'; } }, 180000);
+    cleanups.push(() => clearTimeout(idle));
+    cleanups.push(() => { M.hooks.onAuth = null; });
   });
+}
+
+// Phones turned sideways get a one-tap full screen button for a few seconds.
+{
+  const mq = window.matchMedia('(orientation: landscape) and (pointer: coarse)');
+  let shown = false;
+  const offer = () => {
+    if (!mq.matches || shown || M.isFullscreen() || !document.getElementById('title').classList.contains('hidden')) return;
+    shown = true;
+    const b = h('button', 'btn small primary fs-float', '⛶ Full screen');
+    b.onclick = () => { b.remove(); M.goFullscreen(); };
+    document.getElementById('app').appendChild(b);
+    setTimeout(() => b.remove(), 7000);
+  };
+  if (mq.addEventListener) mq.addEventListener('change', offer);
+  window.__offerFullscreen = offer;
 }
 
 // ---------------- boot ----------------
 async function main() {
   window.addEventListener('pointerdown', () => { sfx.unlock(); if (!sfx.muted) music.play('clinic'); }, { once: true });
+  M.checkState(state);
   startTitleScene();
   document.getElementById('loading')?.remove();
   const mode = await showTitle();
   stopTitleScene();
+  setTimeout(() => window.__offerFullscreen && window.__offerFullscreen(), 800);
   if (!sfx.muted) music.play('clinic');
   ui.showHUD(true);
   ui.setHUD({ day: state.day, money: state.money, patient: '' });
@@ -641,9 +889,20 @@ async function main() {
   while (true) await playDay();
 }
 
+// debug: ?lineup shows a row of random patients (for checking how they look)
+const lineup = new URLSearchParams(location.search).get('lineup');
 // debug helpers for testing individual mini-games: ?test=surgery
 const test = new URLSearchParams(location.search).get('test');
-if (test) {
+if (lineup !== null) {
+  document.getElementById('loading')?.remove();
+  document.getElementById('title').classList.add('hidden');
+  const ages = ['kid', 'adult', 'elder', 'teen', 'kid', 'adult', 'teen', 'elder'];
+  const people = ages.map((a, i) => { const p = new Person(D.randomLook(a, i % 2 ? 'f' : 'm')); p.placeStanding(-2.45 + i * 0.7, 1.4, 0); p.setPose('stand', true); if (lineup === 'expr') p.expr(['smile', 'happy', 'angry', 'sad', 'scared', 'laugh', 'smug', 'ouch'][i]); E.scene.add(p.root); return p; });
+  nurse.root.visible = false;
+  E.onUpdate((dt, t) => people.forEach(p => p.update(dt, t)));
+  E.basePos.set(0, 1.25, 4.6); E.camTarget.set(0, 0.95, 1.4);
+  window.__people = people;
+} else if (test) {
   (async () => {
     document.getElementById('loading')?.remove();
     document.getElementById('title').classList.add('hidden');
