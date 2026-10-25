@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   days INTEGER NOT NULL DEFAULT 0,
   earned INTEGER NOT NULL DEFAULT 0,
   gifted INTEGER NOT NULL DEFAULT 0,
+  rank INTEGER NOT NULL DEFAULT 0,
+  hidden INTEGER NOT NULL DEFAULT 0,
   save TEXT,
   updated_at INTEGER,
   fails INTEGER NOT NULL DEFAULT 0,
@@ -36,7 +38,14 @@ CREATE TABLE IF NOT EXISTS gifts (
   money INTEGER NOT NULL DEFAULT 0,
   upgrades TEXT,
   from_name TEXT,
+  action TEXT,
   created_at INTEGER NOT NULL,
   claimed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_gifts_user ON gifts(user_id, claimed_at);
+CREATE INDEX IF NOT EXISTS idx_users_rank ON users(rank DESC);
+CREATE TABLE IF NOT EXISTS config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);

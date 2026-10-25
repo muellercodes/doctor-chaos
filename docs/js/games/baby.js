@@ -65,6 +65,7 @@ export async function play(G, P) {
       const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -(head.z + 0.3));
       let lastX = null, dir = 0, ext = 0, count = 0, tt = 0;
       G.dbg.phase = 'rattle';
+      E.input.requireRelease();
       await new Promise(res => {
         const off = S.update(dt => {
           tt += dt;
@@ -95,6 +96,7 @@ export async function play(G, P) {
       ui.hint('Wait until the baby <b>looks at you</b>, then click: <b>PEEKABOO!</b>');
       let gain = 0;
       G.dbg.phase = 'peek';
+      E.input.requireRelease();
       for (let round = 0; round < 3; round++) {
         hands.classList.add('closed');
         let clicked = false, lookT = 0;
@@ -130,6 +132,7 @@ export async function play(G, P) {
       else await react((f === favFace ? 30 : 13) * mult.face, 'face');
     }
     G.dbg.phase = 'choose';
+    E.input.requireRelease();
     if (Math.random() < 0.35 && parentTalk < 2) { parentTalk++; parent.talk(1.2); parentSay(pick(c.parentRemarks)); }
     if (calm >= 100) {
       // ---- the shot ----

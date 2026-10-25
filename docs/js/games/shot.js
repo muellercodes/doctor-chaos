@@ -94,6 +94,7 @@ export async function play(G, P, prm = {}) {
   let failed = false;
   let pending = null, aiming = false, curAng = base;
   G.dbg.phase = 'aim'; G.dbg.angErr = () => Math.abs(curAng - base); G.dbg.green = green;
+  E.input.requireRelease();
   let pendingAng = base;
   S.on('down', () => { if (aiming) { pending = E.pointerOnPlane(plane) || target.clone(); pendingAng = curAng; } });
   while (true) {
@@ -135,6 +136,17 @@ export async function play(G, P, prm = {}) {
     // snap to target at ideal angle
     const sp = syr.position.clone(), sa = ang;
     await E.tween(0.2, k => { syr.position.lerpVectors(sp, target.clone().add(new THREE.Vector3(0, 0, -0.006 * s)), k); syr.rotation.set(0.18, 0, sa + (base - sa) * k - Math.PI / 2, 'ZYX'); });
+    // the needle slides in under the skin (the arm hides the part that goes in)
+    const tipDir = new THREE.Vector3(-Math.cos(base), -Math.sin(base), -0.18).normalize();
+    const s0 = syr.position.clone();
+    person.expr('ouch'); person.wiggle = 0.15;
+    await E.tween(0.25, k => syr.position.copy(s0).addScaledVector(tipDir, 0.05 * s * k));
+    // a little dimple where the needle went in
+    const dimpleMat = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.18, depthWrite: false }); dimpleMat.userData.dispose = true;
+    const dimple = new THREE.Mesh(new THREE.RingGeometry(0.004 * s, 0.012 * s, 18), dimpleMat);
+    dimple.position.copy(target); dimple.position.z += 0.003; dimple.renderOrder = 3; S.add(dimple);
+    S.defer(() => {});
+    G.dbg.dimple = dimple;
     break;
   }
   angM.remove();
@@ -150,6 +162,7 @@ export async function play(G, P, prm = {}) {
     const progM = ui.meter({ label: 'Medicine', value: 0, fill: '#5dd6ff' });
     let pr = 0, prog = 0;
     G.dbg.phase = 'push'; G.dbg.pr = () => pr; G.dbg.zone = [gLo, gHi];
+    E.input.requireRelease();
     const rate = (0.95 + diff * 0.7);
     await new Promise(res => {
       const off = S.update(dt => {
@@ -174,11 +187,20 @@ export async function play(G, P, prm = {}) {
     });
     presM.remove(); progM.remove();
     sfx.ding();
-    // retract & bandage
+    // pull the needle out, press a cotton ball on it, then the bandage
     const sp = syr.position.clone();
     const dirv = new THREE.Vector3(Math.cos(base), Math.sin(base), 0.18).normalize();
     await E.tween(0.35, k => syr.position.copy(sp).addScaledVector(dirv, 0.12 * s * k));
     syr.visible = false;
+    if (G.dbg.dimple) G.dbg.dimple.visible = false;
+    const dotM = new THREE.MeshBasicMaterial({ color: '#b3122e', depthWrite: false }); dotM.userData.dispose = true;
+    const bloodDot = new THREE.Mesh(new THREE.CircleGeometry(0.0045 * s, 12), dotM); bloodDot.position.copy(target); bloodDot.position.z += 0.003; S.add(bloodDot);
+    const cotton = new THREE.Mesh(new THREE.SphereGeometry(0.022 * s, 12, 10), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 1 })); cotton.material.userData.dispose = true;
+    cotton.scale.set(1, 1, 0.6); S.add(cotton);
+    await E.tween(0.25, k => cotton.position.copy(target).add(new THREE.Vector3(0.05 * s * (1 - k), 0.06 * s * (1 - k), 0.012 * s)));
+    person.expr('worried');
+    await E.wait(0.5);
+    cotton.visible = false; bloodDot.visible = false;
     const band = bandage(G.bandageColor || '#ffcc80'); band.scale.setScalar(s * 1.1);
     const local = person.j['sh' + side].worldToLocal(target.clone());
     band.position.copy(local).multiplyScalar(1);

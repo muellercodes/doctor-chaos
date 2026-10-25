@@ -538,3 +538,53 @@ svg.ic.in { width: 1.2em; height: 1.2em; vertical-align: -0.25em; }
 .day-rank { font-weight: 700; color: var(--teal-d); margin: -4px 0 6px; }
 .day-rank svg.ic { width: 22px; height: 22px; vertical-align: -5px; }
 .pause-card .card-icon { cursor: pointer; }
+
+/* bubbles that move out of the way during a procedure */
+.bubble-dock { position: absolute; left: max(12px, env(safe-area-inset-left)); top: 62px; z-index: 6; display: flex; flex-direction: column; gap: 6px; max-width: min(300px, 40vw); pointer-events: none; }
+.bubble.docked { position: relative; transform: none !important; max-width: 100%; font-size: 15px; padding: 6px 11px 7px; opacity: 0.94; }
+.bubble.docked::before, .bubble.docked::after { display: none; }
+.bubble.docked .bubble-name { font-size: 11px; }
+@media (max-height: 420px) { .bubble-dock { max-width: min(260px, 36vw); } .bubble.docked { font-size: 13px; } }
+
+/* tools listed on the patient chart */
+.chart-tools { margin-top: 8px; background: #eef9f7; border: 2px solid var(--teal); border-radius: 10px; padding: 6px 8px; }
+.chart-tools-title { font-weight: 700; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--teal-d); margin-bottom: 3px; }
+.chart-tool { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 16px; padding: 2px 0; }
+.chart-tool svg { width: 28px; height: 28px; flex: 0 0 28px; }
+.chart-tool svg.ic.in { width: 18px; height: 18px; flex-basis: 18px; margin-left: auto; }
+.chart-tool.done { opacity: 0.5; text-decoration: line-through; }
+.chart-tool.now span { background: #fff1a8; border-radius: 6px; padding: 0 4px; }
+@media (max-height: 420px) { .chart-tool { font-size: 13px; } .chart-tool svg { width: 22px; height: 22px; flex-basis: 22px; } }
+
+/* admin panel v2 */
+.admin-panel { max-width: min(620px, calc(100vw - 24px)); }
+.admin-sections { max-height: min(52vh, 460px); overflow: auto; padding: 2px 4px; margin-top: 6px; text-align: left; }
+.admin-sec { border-top: 2px dashed #d9e2ec; padding-top: 6px; margin-top: 8px; }
+.admin-field { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+.admin-field label { font-weight: 700; font-size: 14px; min-width: 104px; }
+.admin-field input, .admin-select { font: 600 16px var(--font); border: 3px solid var(--ink); border-radius: 10px; padding: 5px 9px; width: 130px; -webkit-user-select: text; user-select: text; background: #fff; color: var(--ink); }
+.admin-select { width: auto; max-width: 260px; }
+.admin-row { margin: 4px 0; }
+.admin-who { font-size: 20px; display: flex; flex-direction: column; align-items: center; }
+.admin-who span { font-size: 14px; color: var(--teal-d); font-weight: 700; }
+.admin-user.hid { opacity: 0.6; }
+.admin-event { text-align: left; background: #fff6d6; border: 2px solid #d4a017; border-radius: 12px; padding: 6px 10px 10px; margin-bottom: 6px; }
+.admin-event p { margin: 2px 0 6px; }
+.btn.danger { background: #ffd6d6; }
+.err { color: #c21d3b; }
+.promo-num { font-weight: 700; color: var(--ink2); margin: -4px 0 6px; }
+.promo-ups { text-align: left; margin: 8px auto 4px; max-width: 440px; display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.promo-ups b { flex-basis: 100%; }
+.promo-ups span { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.promo-ups svg.ic { width: 22px; height: 22px; }
+.boost { font-weight: 700; color: #b8860b; }
+.tabs .tab { white-space: nowrap; }
+/* blood pressure dial */
+.bp-dial { width: 132px; height: 132px; margin: 0 0 6px auto; filter: drop-shadow(0 4px 0 rgba(29,43,54,0.9)); }
+.bp-dial svg { width: 100%; height: 100%; display: block; }
+@media (max-height: 420px) { .bp-dial { width: 104px; height: 104px; } }
+
+/* bigger tap targets for secrets on phones */
+.spk { padding: 8px; margin: -8px; touch-action: manipulation; }
+.tagline, .logo i { -webkit-touch-callout: none; touch-action: manipulation; }
+.logo { touch-action: none; }

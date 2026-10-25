@@ -5,7 +5,7 @@ import { h } from './ui.js';
 import { icon } from './icons.js';
 export { icon };
 
-export const VERSION = '1.5.0';
+export const VERSION = '1.6.0';
 
 const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null') || {}; } catch (e) { return {}; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };
@@ -150,8 +150,14 @@ export const ACHIEVEMENTS = [
   { id: 'all_tools', icon: 'sparkle', name: 'Tool Collector', desc: 'Use every single tool in the tray at least once.' },
   { id: 'xray_perfect', icon: 'xray', name: 'Say Cheese', desc: 'Take a perfect X-ray on the first try.' },
   { id: 'promoted', icon: 'medal:1', name: 'Moving On Up', desc: 'Get promoted by maxing out every upgrade.' },
-  { id: 'director', icon: 'crown', name: 'Corner Office', desc: 'Become Hospital Director.' },
-  { id: 'legend', icon: 'bigstar', name: 'Legend of Medicine', desc: 'Reach the very top rank.' },
+  { id: 'new_dept', icon: 'hospital', name: 'New Department', desc: 'Get promoted into a whole new department.' },
+  { id: 'director', icon: 'crown', name: 'Corner Office', desc: 'Become Chief of a department.' },
+  { id: 'promo10', icon: 'medal:2', name: 'Climbing the Ladder', desc: 'Get promoted 10 times.' },
+  { id: 'promo25', icon: 'medal:3', name: 'Hospital Royalty', desc: 'Get promoted 25 times.' },
+  { id: 'promo50', icon: 'trophy', name: 'Halfway to Burgers', desc: 'Get promoted 50 times. Something feels off.' },
+  { id: 'legend', icon: 'bigstar', name: 'Chief of Superheroes', desc: 'Reach promotion 99, the top job in medicine.' },
+  { id: 'fast_food', icon: 'taco', name: 'Would You Like Fries With That?', desc: 'Get promoted 100 times. Into fast food.' },
+  { id: 'tycoon', icon: 'crown', name: 'Burger Tycoon', desc: 'Reach the very last job in the game.' },
   { id: 'inspector', icon: 'scroll', name: 'Passed Inspection', desc: 'Get 3 stars while the inspector watches.' },
   { id: 'code1', icon: 'lock', name: 'Code Breaker', desc: 'Enter a secret code.' },
   { id: 'code_all', icon: 'detective', name: 'Master Hacker', desc: 'Enter every secret code.' },
@@ -210,6 +216,7 @@ export function unlock(id) {
   return true;
 }
 export const has = id => !!profile.ach[id];
+export function unlockAll() { for (const a of ACHIEVEMENTS) if (!profile.ach[a.id]) profile.ach[a.id] = Date.now(); saveProfile(); }
 
 // Checks that only need the save state.
 export function checkState(state) {
@@ -306,9 +313,11 @@ function migrateCodes() {
 migrateCodes();
 export const CHEAT_NAMES = { bighead: 'Big Head Mode', party: 'Party Mode', squeaky: 'Squeaky Voices', zoomies: 'Zoomies', spooky: 'Spooky Clinic', cats: 'Cat Ears', robot: 'Robot Voices' };
 
-export function enterCode(raw) {
+export function enterCode(raw, { quiet = false } = {}) {
   const code = String(raw || '').toUpperCase().replace(/[^A-Z]/g, '');
   if (!code) return { ok: false, msg: 'Type a code first.' };
+  // a few secret words work here too, so phones and tablets can find them without a keyboard
+  if (hooks.secretWord && ['LINUS', 'NURSEPAT', 'MANAGERPAT'].includes(code)) { hooks.secretWord(code); return { ok: true, msg: code === 'LINUS' ? '<b>Hi, Linus!</b> The boss is in the building.' : `<b>${code === 'MANAGERPAT' ? 'Manager' : 'Nurse'} Pat heard that.</b> Pat hears everything.` }; }
   const hsh = codeHash(code);
   const row = CODE_TABLE.find(r => r.h === hsh);
   const c = row && unscramble(row.d, code);
@@ -402,27 +411,72 @@ export async function claimGifts() {
     const lines = [];
     for (const g of r.gifts) {
       const res = hooks.applyGift(g) || { names: [] };
-      const bits = [];
-      if (g.money) bits.push(`<b>${fmt(g.money)}</b>`);
-      bits.push(...res.names.map(esc));
-      if (bits.length) lines.push(`<li>${bits.join(', ')}</li>`);
+      for (const n of res.names) lines.push(`<li>${n}</li>`);
     }
+    if (!lines.length) return;
     sfx.great();
     const from = r.gifts[0].from || 'the creator';
-    await message({ icon: icon('gift'), title: `A gift from ${esc(from)}!`, html: `<ul class="gift-list">${lines.join('')}</ul><p class="muted">Gifted money does not count toward the money-earned leaderboard.</p>`, buttons: [{ label: 'Thank you!', value: true, cls: 'primary' }] });
+    const self = from === auth.username;
+    await message({ icon: icon(self ? 'shield' : 'gift'), title: self ? 'Admin changes applied' : `A gift from ${esc(from)}!`, html: `<ul class="gift-list">${lines.join('')}</ul>`, buttons: [{ label: self ? 'OK' : 'Thank you!', value: true, cls: 'primary' }] });
     queueSync(true);
   } finally { claiming = false; }
 }
 export const isAdmin = isCreator;
-export function openAdmin() {
+// The creator's admin panel: change anything about any player (or yourself), and run game-wide events.
+export function openAdmin(opts = {}) {
+  const C = hooks.career;
+  const num = v => { const n = Number(String(v).replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? Math.round(n) : null; };
+  const rankName = r => (C ? C.rankInfo(r).title : 'Rank ' + r);
   return panel((card, close) => {
-    let users = [], filter = '', pick = null;
+    let users = [], config = { payBoost: 1, boostUntil: 0 }, filter = '', pick = null, flash = opts.flash || '';
+    const wantPick = opts.pick || null;
+    const send = async (action, okText) => {
+      const r = await api('/admin/action', { method: 'POST', authed: true, body: { to: pick.username, action } });
+      if (!r.ok) { flash = '<span class="err">' + esc(r.error) + '</span>'; sfx.bad(); render(); return false; }
+      sfx.great();
+      flash = esc(okText || 'Done!') + (pick.username === auth.username ? '' : ` ${esc(pick.username)} sees it next time they play.`);
+      // keep the list in step with what the boards now show
+      const u = users.find(x => x.username === pick.username);
+      if (u) {
+        if (action.type === 'gift' && action.money) { u.money += action.money; u.earned += action.money; }
+        if (action.type === 'setMoney') u.money = action.value;
+        if (action.type === 'setEarned') u.earned = action.value;
+        if (action.type === 'setDaysPlayed') u.days = action.value;
+        if (action.type === 'setRank') u.rank = action.value;
+        if (action.type === 'hide') u.hidden = action.value ? 1 : 0;
+        if (action.type === 'reset') Object.assign(u, { money: 200, days: 0, earned: 0, rank: 0 });
+        pick = u;
+      }
+      if (pick.username === auth.username) { const keep = flash; close(null); await claimGifts(); openAdmin({ pick: pick.username, flash: keep }); return true; }
+      render();
+      return true;
+    };
+    const field = (label, value, btns) => {
+      const row = h('div', 'admin-field');
+      row.appendChild(h('label', '', label));
+      const inp = h('input'); inp.type = 'text'; inp.inputMode = 'numeric'; inp.value = value; inp.autocomplete = 'off';
+      row.appendChild(inp);
+      for (const [txt, fn, cls] of btns) { const b = h('button', 'btn small ' + (cls || ''), txt); b.onclick = () => { sfx.click(); const n = num(inp.value); if (n === null) { flash = '<span class="err">Type a number first.</span>'; render(); return; } fn(n); }; row.appendChild(b); }
+      return row;
+    };
     const render = () => {
       card.querySelectorAll(':scope > :not(.panel-x)').forEach(n => n.remove());
       card.appendChild(h('div', 'card-icon', icon('shield')));
       card.appendChild(h('div', 'card-title', 'Admin Panel'));
       if (!pick) {
-        card.appendChild(h('p', 'muted', 'Send money and upgrades to any player, or to yourself. Only the Creater account can open this.'));
+        // game-wide events
+        const ev = h('div', 'admin-event');
+        const on = config.payBoost > 1 && config.boostUntil > Date.now();
+        ev.innerHTML = `<div class="admin-label">Event for everyone</div><p class="muted">${on ? `<b>${config.payBoost}x pay</b> is on for ${Math.max(1, Math.round((config.boostUntil - Date.now()) / 6e4))} more minutes.` : 'No event running.'}</p>`;
+        const evRow = h('div', 'admin-money');
+        for (const [x, hrs, label] of [[2, 1, '2x pay, 1 hour'], [2, 24, '2x pay, 1 day'], [3, 1, '3x pay, 1 hour'], [5, 1, '5x pay, 1 hour'], [1, 1, 'Stop event']]) {
+          const b = h('button', 'btn small' + (x === 1 ? '' : ''), label);
+          b.onclick = async () => { sfx.click(); const r = await api('/admin/config', { method: 'POST', authed: true, body: { payBoost: x, hours: hrs } }); if (r.ok) { config = r.config; hooks.onConfig && hooks.onConfig(config); flash = x > 1 ? `${x}x pay is on for everyone.` : 'Event stopped.'; sfx.great(); } else flash = '<span class="err">' + esc(r.error) + '</span>'; render(); };
+          evRow.appendChild(b);
+        }
+        ev.appendChild(evRow); card.appendChild(ev);
+        if (flash) { card.appendChild(h('div', 'form-ok', flash)); flash = ''; }
+        card.appendChild(h('div', 'admin-label', 'Players'));
         const search = h('input', 'admin-search'); search.placeholder = 'Find a player'; search.value = filter;
         search.oninput = () => { filter = search.value; drawList(); };
         card.appendChild(search);
@@ -430,60 +484,78 @@ export function openAdmin() {
         const drawList = () => {
           if (!users.length) { box.innerHTML = '<div class="lb-msg">Loading players…</div>'; return; }
           const me = users.find(u => u.username === auth.username);
-          const rest = users.filter(u => u !== me && u.username.toLowerCase().includes(filter.toLowerCase()));
+          const match = u => u.username.toLowerCase().includes(filter.toLowerCase());
+          const list = (me && match(me) ? [me] : []).concat(users.filter(u => u !== me && match(u)));
           box.innerHTML = '';
-          for (const u of (me && (!filter || me.username.toLowerCase().includes(filter.toLowerCase())) ? [me, ...rest] : rest)) {
-            const b = h('button', 'admin-user' + (u === me ? ' me' : ''), `<b>${esc(u.username)}${u === me ? ' (you)' : ''}</b><span>Day ${u.days || 0} · ${fmt(u.earned || 0)} earned</span>`);
+          for (const u of list) {
+            const b = h('button', 'admin-user' + (u === me ? ' me' : '') + (u.hidden ? ' hid' : ''), `<b>${esc(u.username)}${u === me ? ' (you)' : ''}${u.hidden ? ' (hidden)' : ''}</b><span>${esc(rankName(u.rank || 0))} · Day ${u.days || 0} · ${fmt(u.earned || 0)} earned</span>`);
             b.onclick = () => { sfx.click(); pick = u; render(); };
             box.appendChild(b);
           }
           if (!box.children.length) box.innerHTML = '<div class="lb-msg">Nobody by that name.</div>';
         };
         drawList();
-        if (!users.length) api('/admin/users', { authed: true }).then(r => { if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; } users = r.users || []; drawList(); });
+        if (!users.length) api('/admin/users', { authed: true }).then(r => { if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; } users = r.users || []; config = r.config || config; if (wantPick) pick = users.find(u => u.username === wantPick) || null; render(); });
         return;
       }
-      // one player
-      const gift = { money: 0, upgrades: {} };
-      card.appendChild(h('div', 'admin-who', `To: <b>${esc(pick.username)}</b>${pick.username === auth.username ? ' (you)' : ''}`));
-      const sum = h('div', 'admin-sum');
-      const drawSum = () => {
-        const ups = gift.upgrades === 'max' ? ['every upgrade maxed'] : Object.entries(gift.upgrades).map(([id, n]) => `${(hooks.upgradeList ? hooks.upgradeList() : []).find(u => u.id === id)?.name || id} +${n}`);
-        sum.innerHTML = gift.money || ups.length ? `Sending: ${[gift.money ? fmt(gift.money) : '', ...ups].filter(Boolean).join(', ')}` : '<span class="muted">Pick some money or upgrades.</span>';
-      };
-      const money = h('div', 'admin-money');
-      for (const n of [100, 500, 1000, 5000, 10000]) { const b = h('button', 'btn small', '+' + fmt(n)); b.onclick = () => { sfx.coin(); gift.money = Math.min(1000000, gift.money + n); drawSum(); }; money.appendChild(b); }
-      const clr = h('button', 'btn small', 'Clear'); clr.onclick = () => { sfx.click(); gift.money = 0; gift.upgrades = {}; drawSum(); }; money.appendChild(clr);
-      card.appendChild(h('div', 'admin-label', 'Money')); card.appendChild(money);
-      const ups = h('div', 'admin-ups');
-      for (const u of (hooks.upgradeList ? hooks.upgradeList() : [])) {
-        const b = h('button', 'btn small', `${icon(u.icon, 'in')} ${esc(u.name)} +1`);
-        b.onclick = () => { sfx.click(); if (gift.upgrades === 'max') gift.upgrades = {}; gift.upgrades[u.id] = Math.min(10, (gift.upgrades[u.id] || 0) + 1); drawSum(); };
-        ups.appendChild(b);
+      // ---- one player ----
+      const u = pick, me = u.username === auth.username;
+      card.appendChild(h('div', 'admin-who', `<b>${esc(u.username)}</b>${me ? ' (you)' : ''}<span>${esc(rankName(u.rank || 0))}</span>`));
+      card.appendChild(h('div', 'acct-stats', `<div><b>${fmt(u.money || 0)}</b><span>bank</span></div><div><b>${fmt(u.earned || 0)}</b><span>earned</span></div><div><b>${u.days || 0}</b><span>days played</span></div><div><b>${u.rank || 0}</b><span>promotions</span></div>`));
+      if (flash) { card.appendChild(h('div', 'form-ok', flash)); flash = ''; }
+      const wrap = h('div', 'admin-sections'); card.appendChild(wrap);
+      const sec = (title) => { const d = h('div', 'admin-sec'); d.appendChild(h('div', 'admin-label', title)); wrap.appendChild(d); return d; };
+      const m = sec('Money');
+      m.appendChild(field('Amount', '1000', [
+        ['Give', n => send({ type: 'gift', money: Math.max(0, n) }, `Gave ${fmt(n)}. It counts toward money earned.`), 'primary'],
+        ['Set bank to', n => send({ type: 'setMoney', value: n }, `Bank set to ${fmt(n)}.`)],
+      ]));
+      const lb = sec('Leaderboards');
+      lb.appendChild(field('Money earned', String(u.earned || 0), [['Set', n => send({ type: 'setEarned', value: Math.max(0, n) }, `Money earned set to ${fmt(n)}.`)]]));
+      lb.appendChild(field('Days played', String(u.days || 0), [['Set', n => send({ type: 'setDaysPlayed', value: Math.max(0, n) }, `Days played set to ${n}.`)]]));
+      const hide = h('button', 'btn small', u.hidden ? 'Show on leaderboards' : 'Hide from leaderboards');
+      hide.onclick = () => { sfx.click(); send({ type: 'hide', value: !u.hidden }, u.hidden ? 'Back on the leaderboards.' : 'Hidden from the leaderboards.'); };
+      lb.appendChild(h('div', 'admin-row')).appendChild(hide);
+      const job = sec('Job and day');
+      if (C) {
+        const row = h('div', 'admin-field');
+        row.appendChild(h('label', '', 'Job'));
+        const sel = h('select', 'admin-select');
+        for (let r = 0; r <= C.MAX_RANK; r++) { const o = h('option', '', `${r}. ${rankName(r)}`); o.value = r; if (r === (u.rank || 0)) o.selected = true; sel.appendChild(o); }
+        row.appendChild(sel);
+        const b = h('button', 'btn small', 'Set job'); b.onclick = () => { sfx.click(); const r = Number(sel.value); send({ type: 'setRank', value: r }, `Job set to ${rankName(r)}.`); };
+        row.appendChild(b); job.appendChild(row);
       }
-      const mx = h('button', 'btn small', icon('sparkle', 'in') + ' Max everything'); mx.onclick = () => { sfx.click(); gift.upgrades = 'max'; drawSum(); }; ups.appendChild(mx);
-      card.appendChild(h('div', 'admin-label', 'Upgrades')); card.appendChild(ups);
-      card.appendChild(sum); drawSum();
-      const msg = h('div', 'form-err'); card.appendChild(msg);
-      const row = h('div', 'card-buttons');
-      const back = h('button', 'btn', 'Back'); back.onclick = () => { sfx.click(); pick = null; render(); };
-      const send = h('button', 'btn primary', icon('gift', 'in') + ' Send gift');
-      send.onclick = async () => {
-        const hasUp = gift.upgrades === 'max' || Object.keys(gift.upgrades).length;
-        if (!gift.money && !hasUp) { msg.textContent = 'Pick some money or an upgrade first.'; sfx.bad(); return; }
-        send.disabled = true; send.textContent = 'Sending…';
-        const r = await api('/admin/gift', { method: 'POST', authed: true, body: { to: pick.username, money: gift.money, upgrades: hasUp ? gift.upgrades : null } });
-        send.disabled = false; send.innerHTML = icon('gift', 'in') + ' Send gift';
-        if (!r.ok) { msg.textContent = r.error; sfx.bad(); return; }
-        sfx.great();
-        msg.className = 'form-ok'; msg.textContent = pick.username === auth.username ? 'Sent! Opening it now…' : `Sent! ${pick.username} gets it next time they play.`;
-        gift.money = 0; gift.upgrades = {}; drawSum();
-        if (pick.username === auth.username) { close(null); await claimGifts(); }
+      job.appendChild(field('Current day', '1', [['Jump to day', n => send({ type: 'setDay', value: Math.max(1, n) }, `Jumped to day ${n}.`)]]));
+      const up = sec('Upgrades (this job)');
+      const upRow = h('div', 'admin-money');
+      const list = me && hooks.upgradeList ? hooks.upgradeList() : [{ name: 'Slot 1' }, { name: 'Slot 2' }, { name: 'Slot 3' }, { name: 'Slot 4' }];
+      list.forEach((x, i) => { const b = h('button', 'btn small', `${x.icon ? icon(x.icon, 'in') + ' ' : ''}${esc(x.name)} +1`); b.onclick = () => { sfx.click(); send({ type: 'upgrades', mode: 'add', slot: i, n: 1 }, `${x.name} +1.`); }; upRow.appendChild(b); });
+      const mx = h('button', 'btn small', icon('sparkle', 'in') + ' Max all'); mx.onclick = () => { sfx.click(); send({ type: 'upgrades', mode: 'max' }, 'Every upgrade maxed. Promotion comes at the end of the day.'); }; upRow.appendChild(mx);
+      const rs = h('button', 'btn small', 'Reset all'); rs.onclick = () => { sfx.click(); send({ type: 'upgrades', mode: 'reset' }, 'Upgrades reset.'); }; upRow.appendChild(rs);
+      up.appendChild(upRow);
+      const ex = sec('Extras');
+      const exRow = h('div', 'admin-money');
+      const aw = h('button', 'btn small', icon('trophy', 'in') + ' Unlock every award'); aw.onclick = () => { sfx.click(); send({ type: 'unlockAwards' }, 'Every award unlocked.'); };
+      const cd = h('button', 'btn small', icon('key', 'in') + ' Use every secret code'); cd.onclick = () => { sfx.click(); send({ type: 'unlockCodes' }, 'Every secret code used.'); };
+      const rst = h('button', 'btn small danger', 'Start over');
+      let armed = false;
+      rst.onclick = () => {
+        sfx.click();
+        if (!armed) { armed = true; rst.textContent = 'Tap again: erase their progress'; setTimeout(() => { armed = false; rst.textContent = 'Start over'; }, 4000); return; }
+        send({ type: 'reset' }, `${u.username} starts over from day 1.`);
       };
-      row.append(back, send); card.appendChild(row);
+      exRow.append(aw, cd, rst); ex.appendChild(exRow);
+      const row = h('div', 'card-buttons');
+      const back = h('button', 'btn', 'Back to players'); back.onclick = () => { sfx.click(); pick = null; render(); };
+      row.append(back); card.appendChild(row);
     };
     render();
   }, { cls: 'admin-panel' });
+}
+export async function loadConfig() {
+  const r = await api('/config');
+  if (r.ok && hooks.onConfig) hooks.onConfig({ payBoost: r.payBoost || 1, boostUntil: r.boostUntil || 0 });
 }
 
 function cloudBlob() {
@@ -500,7 +572,7 @@ export async function syncNow() {
   if (!auth.token || !hooks.getState) return;
   const st = hooks.getState();
   if (!st) return;
-  await api('/progress', { method: 'PUT', authed: true, body: { save: cloudBlob(), money: Math.round(st.money), days: counter('days'), earned: Math.round(counter('earned')) } });
+  await api('/progress', { method: 'PUT', authed: true, body: { save: cloudBlob(), money: Math.round(st.money), days: counter('days'), earned: Math.round(counter('earned')), rank: st.rank || 0 } });
 }
 function mergeProfile(p) {
   if (!p) return;
@@ -612,26 +684,29 @@ export function openLeaderboard() {
     card.appendChild(h('div', 'card-icon', icon('chart')));
     card.appendChild(h('div', 'card-title', 'Leaderboards'));
     const tabs = h('div', 'tabs');
-    const tM = h('button', 'tab on', 'Most money earned'), tD = h('button', 'tab', 'Most days played');
-    tabs.append(tM, tD); card.appendChild(tabs);
+    const tM = h('button', 'tab on', 'Money earned'), tD = h('button', 'tab', 'Days played'), tR = h('button', 'tab', 'Best job');
+    tabs.append(tM, tD, tR); card.appendChild(tabs);
+    const C = hooks.career;
+    const val = (by, v) => (by === 'days' ? v + (v === 1 ? ' day' : ' days') : by === 'rank' ? (C ? esc(C.rankInfo(v).title) : 'Rank ' + v) : fmt(v));
     const box = h('div', 'lb-box'); card.appendChild(box);
     const foot = h('div', 'lb-foot'); card.appendChild(foot);
     const show = async by => {
-      tM.classList.toggle('on', by === 'earned'); tD.classList.toggle('on', by === 'days');
+      tM.classList.toggle('on', by === 'earned'); tD.classList.toggle('on', by === 'days'); tR.classList.toggle('on', by === 'rank');
       box.innerHTML = '<div class="lb-msg">Loading…</div>';
       if (auth.token) await syncNow();
       const r = await api('/leaderboard?by=' + by, { authed: true });
       if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; }
       if (!r.top.length) { box.innerHTML = '<div class="lb-msg">Nobody here yet. Be the first!</div>'; }
       else {
-        const rows = r.top.map((x, i) => `<tr class="${auth.username && x.username.toLowerCase() === auth.username.toLowerCase() ? 'me' : ''}"><td class="rk">${i < 3 ? icon('medal:' + (i + 1), 'rank') : i + 1}</td><td class="nm">${esc(x.username)}</td><td class="vl">${by === 'days' ? x.value + (x.value === 1 ? ' day' : ' days') : fmt(x.value)}</td></tr>`).join('');
+        const rows = r.top.map((x, i) => `<tr class="${auth.username && x.username.toLowerCase() === auth.username.toLowerCase() ? 'me' : ''}"><td class="rk">${i < 3 ? icon('medal:' + (i + 1), 'rank') : i + 1}</td><td class="nm">${esc(x.username)}</td><td class="vl">${val(by, x.value)}</td></tr>`).join('');
         box.innerHTML = `<table class="lb">${rows}</table>`;
       }
-      if (r.me) foot.innerHTML = `You're <b>#${r.me.rank}</b> with <b>${by === 'days' ? r.me.value + ' days' : fmt(r.me.value)}</b>.`;
+      if (r.me) foot.innerHTML = `You're <b>#${r.me.rank}</b> with <b>${val(by, r.me.value)}</b>.`;
       else foot.innerHTML = '';
     };
     tM.onclick = () => { sfx.click(); show('earned'); };
     tD.onclick = () => { sfx.click(); show('days'); };
+    tR.onclick = () => { sfx.click(); show('rank'); };
     if (!auth.token) {
       const join = h('button', 'btn small primary', 'Make an account to join');
       join.onclick = () => { sfx.click(); openAccount(); };
@@ -736,6 +811,7 @@ export function openSettings() {
 export async function initMeta(h2) {
   Object.assign(hooks, h2);
   applySettings();
+  loadConfig();
   // a little something for anyone who opens the browser console
   try {
     console.log('%cDOCTOR CHAOS', 'font-size:20px;font-weight:bold;color:#ff8a2a');

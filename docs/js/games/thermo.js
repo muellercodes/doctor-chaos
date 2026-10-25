@@ -1,6 +1,6 @@
 // Thermometer: pop it in the mouth and keep the patient from talking until it beeps.
 import * as THREE from 'three';
-import { clamp, rand, pick, toon } from '../engine.js';
+import { clamp, rand, pick, toon, canvasTexture } from '../engine.js';
 import { icon } from '../icons.js';
 import { holdWith } from '../props.js';
 
@@ -9,14 +9,26 @@ const SHUSHED = ['(mumbles quietly)', 'Mmm-hmm.', '(nods)', 'Mmf.', '(zips lips)
 const FALSE = ["I wasn't even talking!", 'Rude.', '...What did I do?', 'I was being SO quiet.'];
 const WRONG_SPOT = ["That's my nose!", 'Mouth! It goes in the MOUTH!', 'That is my chin, doctor.', 'Ow! My cheek!'];
 
+// a digital thermometer: white body, metal tip, and a little screen that counts up
 function thermometer() {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.0085, 0.0085, 0.13, 10), toon('#ffffff')); body.rotation.z = Math.PI / 2; body.position.x = 0.065; g.add(body);
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.0095, 10, 8), toon('#b0bec5')); g.add(tip);
-  const redG = new THREE.Group(); redG.position.x = 0.012; g.add(redG);
-  const red = new THREE.Mesh(new THREE.CylinderGeometry(0.0038, 0.0038, 0.08, 6), toon('#e63946')); red.rotation.z = Math.PI / 2; red.position.x = 0.04; redG.add(red);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.0098, 0.0098, 0.03, 10), toon('#2bb3a3')); cap.rotation.z = Math.PI / 2; cap.position.x = 0.128; g.add(cap);
-  g.userData.red = redG;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.0095, 0.1, 6, 14), toon('#f7f7f2', { roughness: 0.35 })); body.rotation.z = Math.PI / 2; body.position.x = 0.075; body.scale.z = 0.7; g.add(body);
+  const grip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0102, 0.045, 6, 14), toon('#2bb3a3', { roughness: 0.5 })); grip.rotation.z = Math.PI / 2; grip.position.x = 0.11; grip.scale.z = 0.72; g.add(grip);
+  const tip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0042, 0.02, 4, 10), toon('#c0c8cc')); tip.rotation.z = Math.PI / 2; tip.position.x = 0.006; g.add(tip);
+  const lcd = canvasTexture(128, 48, () => {});
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.036, 0.0125), new THREE.MeshBasicMaterial({ map: lcd.tex })); scr.material.userData.dispose = true;
+  scr.position.set(0.07, 0, 0.0071); g.add(scr);
+  const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.003, 10), toon('#e63946')); btn.rotation.x = Math.PI / 2; btn.position.set(0.1, 0, 0.0072); g.add(btn);
+  let last = '';
+  g.userData.show = (txt, done) => {
+    const key = txt + done; if (key === last) return; last = key;
+    const ctx = lcd.ctx;
+    ctx.fillStyle = done ? '#c8f7c5' : '#d9e8d0'; ctx.fillRect(0, 0, 128, 48);
+    ctx.fillStyle = '#1d2b36'; ctx.font = '700 34px "Courier New", monospace'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, 116, 26);
+    lcd.tex.needsUpdate = true;
+  };
+  g.userData.show('Lo', false);
   return g;
 }
 
@@ -84,14 +96,15 @@ export async function play(G, P) {
       if (reading >= 1 && !busy) { busy = true; phase = 'done'; endRes(false); }
     }
     readM.set(reading);
-    th.userData.red.scale.x = 0.25 + 0.75 * clamp(reading, 0, 1);
+    // the screen counts up from room temperature to the real reading
+    th.userData.show(phase === 'place' && reading < 0.02 ? 'Lo' : (95 + (finalTemp - 95) * Math.min(1, reading)).toFixed(1) + '\u00b0', false);
   });
   S.on('down', () => {
     if (phase === 'place') {
       const p = E.pointerOnPlane(plane());
       const m = mouthW();
       if (p && Math.hypot(p.x - m.x, p.y - m.y) < R * 1.4) {
-        phase = 'read'; sfx.pop(); person.expr('neutral'); newUrge();
+        phase = 'read'; sfx.pop(); person.expr('neutral'); newUrge(); E.input.requireRelease(300);
         ui.hint('Keep them quiet! When you see <b>!</b>, tap to <b>SHH</b>.');
       } else {
         placeMiss++; sfx.bad(); person.expr('angry'); G.mood(-4);
@@ -115,7 +128,8 @@ export async function play(G, P) {
   readM.remove(); ring.visible = false; ui.hint(null);
   if (!failed) {
     sfx.ding();
-    th.userData.red.scale.x = 1;
+    th.userData.show(finalTemp.toFixed(1) + '\u00b0', true);
+    sfx.beep(); setTimeout(() => sfx.beep(), 180); setTimeout(() => sfx.beep(), 360);
     ui.popAt(person.headTop(), `${finalTemp.toFixed(1)}°F`, 'good');
     await E.wait(0.4);
     G.say(finalTemp > 100.4 ? pick(['A fever! I KNEW it. I am basically a doctor.', 'So I AM sick! Can I stay home tomorrow?', 'Is that bad? That sounds bad.']) : pick(['Normal! I am a normal temperature!', 'Phew. Not a fever. Just dramatic.']), { key: 'c', hold: 0.8 });

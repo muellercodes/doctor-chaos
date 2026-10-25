@@ -6,7 +6,7 @@ A goofy 3D doctor game that runs in the browser. Game design by **Linus**.
 
 ## How it plays
 
-Every day, 5 patients come into your exam room. Read their chart, pick the right tool, and fix them up:
+Every day, 5 patients come into your exam room. Read their chart (it lists the tools you will need), pick the right tool, and fix them up:
 
 | Tool | Mini-game |
 | --- | --- |
@@ -39,19 +39,23 @@ There are also funny regulars: a vampire who needs a blood test, a pirate with a
 
 Mess up badly and you get sued. How much depends on how bad it was. Money buys upgrades between days (steadier hands, a lawyer, running shoes, a lollipop jar, coat colors).
 
-Max out every upgrade and you get promoted: Senior Doctor, Head of the Ward, Chief of Medicine, Hospital Director, then Legend of Medicine. Each rank pays more, opens one more level of every upgrade, and changes the job (more patients with two problems, hospital inspectors, emergencies with a timer, six patients a day, a special patient every day).
+Max out every upgrade and you get promoted. There are 100 doctor jobs: 20 departments (Family Medicine, Pediatrics, the ER, Cardiology, the Eye Clinic, Surgery, Space Medicine, the Underwater Hospital, the Dinosaur Clinic, the Superhero Hospital and more), each with five ranks from Intern to Chief. Every promotion swaps in four brand new upgrades made for that job, and the old ones leave a small permanent bonus. Each department sees more of its own kind of patient, and the ranks change the job (more patients with two problems, hospital inspectors, emergencies with a timer, six patients a day, a special patient every day).
 
-Days get a little harder as you go and the clinic has bills to pay at the end of each day. Progress saves after every patient, and the pause button has an option to go back to the main menu without losing anything. There are 64 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, patient voices, talking speed, graphics, screen shake, bigger text, full screen).
+At the 100th promotion the hospital turns into Doctor Burger. The exam room becomes a counter, Nurse Pat hands things over to Manager Pat, and the tools become a grill, a fryer, a soda fountain, a soft serve machine and a burger building station, each with its own mini-game. Ten more jobs go up to Burger Tycoon.
 
-Patients talk out loud (the device's own text-to-speech, a steady voice per patient), make faces that match how they feel, and almost never say the same goodbye twice. The music changes with what is going on.
+Days get a little harder as you go and the clinic has bills to pay at the end of each day. Progress saves after every patient, and the pause button has an option to go back to the main menu without losing anything. There are 70 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, patient voices, talking speed, graphics, screen shake, bigger text, full screen).
+
+Patients talk out loud with a steady voice each, and the voice changes with how they feel (scared, angry, happy, sleepy). They talk about what they came in for and react to what you are doing to them, make faces that match, and almost never say the same goodbye twice. Speech bubbles move up to a corner while you work, and a tap skips a line. The game can play recorded voice files from `docs/voice/` when they exist and falls back to the device's own text-to-speech. The music changes with what is going on.
+
+Dragging is mistake-proof: a drag that ends on a button does not click it, and new buttons ignore taps for a moment after they appear.
 
 There are also secrets. A lot of them. Some are codes you type into Settings. We are not telling you where they are.
 
 ### Accounts and leaderboards
 
-Players can make an account with just a username and a password (no email, nothing personal). An account gets you on two leaderboards (most money earned in total, most days played) and saves your progress in the cloud so you can switch devices. Usernames go through a bad-word filter. Each account keeps its own progress: making a second account starts a new game, and progress from playing without an account can be moved into a brand new account once.
+Players can make an account with just a username and a password (no email, nothing personal). An account gets you on three leaderboards (most money earned in total, most days played, best job) and saves your progress in the cloud so you can switch devices. Usernames go through a bad-word filter. Each account keeps its own progress: making a second account starts a new game, and progress from playing without an account can be moved into a brand new account once.
 
-One account has an admin panel for sending money and upgrades to players (gifts wait on the server until the player's game picks them up, and gifted money does not count on the money-earned leaderboard).
+One account has an admin panel. It can give or take money (gifts count toward money earned), set a player's bank, their money earned or days on the leaderboard, jump them to any day, set their job, give or reset upgrades, unlock every achievement or secret code, start a player over, hide a player from the leaderboards, and turn on pay boost events for everyone. Changes wait on the server until that player's game picks them up.
 
 ### Phones
 
@@ -73,13 +77,17 @@ docs/            the whole site (served as-is)
   js/nav.js      walking paths around the furniture
   js/person.js   patients, nurse, babies
   js/face.js     sculpted heads, skin, eyes, hair, expressions
-  js/speech.js   patient voices (browser text-to-speech)
+  js/speech.js   patient voices (recorded lines when present, device text-to-speech otherwise, with moods)
   js/audio.js    sound effects and the music sequencer
   js/props.js    tools, swallowed objects, cartoon organs
-  js/data.js     names, patients, jokes, lawsuits, reviews
+  js/data.js     names, patients, jokes, lawsuits, reviews, goodbyes
+  js/step-talk.js what patients say before and after each procedure
+  js/career.js   the 110 jobs, their upgrades and what each rank changes
+  js/food-data.js Doctor Burger customers, orders and lines
   js/meta.js     settings, achievements, secret codes, accounts, leaderboards
   js/excuses.js  the pool of injury excuses (each one is used once per save)
-  js/games/      one file per mini-game
+  js/games/      one file per mini-game (food.js has the five kitchen games)
+  voice/         optional recorded voice lines plus manifest.json
 ```
 
 Run locally with any static server (accounts won't work, everything else will):
@@ -102,7 +110,7 @@ schema.sql                   database tables (Cloudflare D1)
 wrangler.toml                Cloudflare config, including the database binding
 ```
 
-Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appendix`, `swallowed`, `reflex`, `steth`, `cast`, `thermo`, `bp`, `otoscope`, `drops`, `bandage`, `xray`, `runner`, `baby`, `sneezy`, `hider`, `scooter`, `germs`, `triplets`, `lightsout`) jumps straight to one patient. `index.html?lineup` shows a row of random patients (`?lineup=expr` with faces). Test pages stay silent (no voices).
+Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appendix`, `swallowed`, `reflex`, `steth`, `cast`, `thermo`, `bp`, `otoscope`, `drops`, `bandage`, `xray`, `runner`, `baby`, `sneezy`, `hider`, `scooter`, `germs`, `triplets`, `lightsout`, and the kitchen games `grill`, `fryer`, `soda`, `sundae`, `assemble`) jumps straight to one patient. Add `&rank=37` to start at a given job. `index.html?lineup` shows a row of random patients (`?lineup=expr` with faces). Test pages stay silent (no voices).
 
 ## Hosting
 

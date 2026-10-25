@@ -69,6 +69,7 @@ export async function play(G, P) {
   actors.forEach(a => { a.root.position.y = a.sitY; a.root.position.z = 0.24; });
   // pick
   G.dbg.phase = 'pick';
+  E.input.requireRelease();
   ui.hint('Which one is sick? <b>Click the sick triplet!</b>');
   let tries = 0, done = false, fail = false;
   let hover = null;

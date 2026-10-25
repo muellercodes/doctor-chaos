@@ -6,6 +6,16 @@ import { GUIDE } from '../../lib/guide.js';
 
 const GUIDE_USER = 'Creater'; // exact spelling and capitals (the guide and the admin panel)
 const UPGRADE_IDS = ['steady', 'lawyer', 'shoes', 'lolli', 'coats'];
+const MAX_RANK = 110;
+const CODE_WORDS = (GUIDE.find(sec => /secret codes/i.test(sec.title)) || { items: [] }).items.map(i => i[0]).filter(w => /^[A-Z]+$/.test(w));
+// pending admin changes for a user; while any are waiting, the player's own syncs do not overwrite the boards
+const pendingFor = (env, id) => env.DB.prepare('SELECT COUNT(*) AS n FROM gifts WHERE user_id = ? AND claimed_at IS NULL').bind(id).first().then(r => (r ? r.n : 0));
+async function getConfig(env) {
+  const { results } = await env.DB.prepare('SELECT key, value FROM config').all();
+  const c = {}; for (const r of results || []) { try { c[r.key] = JSON.parse(r.value); } catch (e) { /* ignore */ } }
+  const boost = c.payBoost && c.payBoost.until > now() ? c.payBoost : null;
+  return { payBoost: boost ? boost.x : 1, boostUntil: boost ? boost.until : 0 };
+}
 
 const ALLOWED_ORIGINS = ['https://muellercodes.github.io', 'https://doctor-chaos.pages.dev'];
 const ITER = 20000; // PBKDF2 rounds (kept modest so it fits the free plan's CPU limit)
@@ -75,7 +85,7 @@ async function currentUser(req, env) {
   if (!s) return null;
   if (s.last_seen < now() - SESSION_DAYS * 864e5) { await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(th).run(); return null; }
   if (s.last_seen < now() - 36e5) await env.DB.prepare('UPDATE sessions SET last_seen = ? WHERE token_hash = ?').bind(now(), th).run();
-  const u = await env.DB.prepare('SELECT id, username, money, days, earned, gifted, save, updated_at FROM users WHERE id = ?').bind(s.user_id).first();
+  const u = await env.DB.prepare('SELECT id, username, money, days, earned, gifted, rank, hidden, save, updated_at FROM users WHERE id = ?').bind(s.user_id).first();
   return u ? { ...u, tokenHash: th } : null;
 }
 
@@ -134,17 +144,19 @@ export async function onRequest(context) {
     // ---- leaderboards (public) ----
     if (route === 'leaderboard' && req.method === 'GET') {
       const q = new URL(req.url).searchParams.get('by');
-      const by = q === 'days' ? 'days' : q === 'money' ? 'money' : 'earned';
-      const { results } = await env.DB.prepare(`SELECT username, ${by} AS value FROM users WHERE updated_at IS NOT NULL ORDER BY ${by} DESC, updated_at ASC LIMIT 50`).all();
+      const by = q === 'days' ? 'days' : q === 'money' ? 'money' : q === 'rank' ? 'rank' : 'earned';
+      const { results } = await env.DB.prepare(`SELECT username, ${by} AS value FROM users WHERE updated_at IS NOT NULL AND hidden = 0 ORDER BY ${by} DESC, updated_at ASC LIMIT 50`).all();
       let me = null;
       const user = await currentUser(req, env);
       if (user && user.updated_at) {
         const v = user[by];
-        const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE updated_at IS NOT NULL AND (${by} > ? OR (${by} = ? AND updated_at < ?))`).bind(v, v, user.updated_at).first();
+        const r = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE updated_at IS NOT NULL AND hidden = 0 AND (${by} > ? OR (${by} = ? AND updated_at < ?))`).bind(v, v, user.updated_at).first();
         me = { rank: r.n + 1, value: v };
       }
       return json(req, { by, top: results, me });
     }
+    // ---- game-wide settings (public) ----
+    if (route === 'config' && req.method === 'GET') return json(req, await getConfig(env));
     // ---- everything below needs a login ----
     const user = await currentUser(req, env);
     if (!user) return fail(req, 'Please log in again.', 401);
@@ -165,49 +177,99 @@ export async function onRequest(context) {
       const b = await readBody(req);
       if (!b) return fail(req, 'Save is too big or broken.');
       if (await limited(env, 'save:' + user.id, 240, 36e5)) return json(req, { ok: true, skipped: true });
-      // days played only goes up; money is sanity-capped so the board stays believable
-      const days = Math.max(user.days, clampInt(b.days, 0, 100000));
-      const money = clampInt(b.money, -1000000, 60000 + days * 15000 + (user.gifted || 0));
-      // total earned only goes up, with a generous cap per day played
-      const earned = Math.max(user.earned || 0, clampInt(b.earned, 0, 100000 + days * 20000));
       const save = b.save ? JSON.stringify(b.save) : null;
       if (save && save.length > 150000) return fail(req, 'Save is too big.');
-      await env.DB.prepare('UPDATE users SET money = ?, days = ?, earned = ?, save = COALESCE(?, save), updated_at = ? WHERE id = ?').bind(money, days, earned, save, now(), user.id).run();
+      // admin changes are waiting for this player's game: keep the boards as the admin set them until it picks them up
+      if (await pendingFor(env, user.id)) {
+        await env.DB.prepare('UPDATE users SET updated_at = ? WHERE id = ?').bind(now(), user.id).run();
+        return json(req, { ok: true, pending: true });
+      }
+      // days played only goes up; money and earned are sanity-capped (promotions raise pay a lot)
+      const days = Math.max(user.days, clampInt(b.days, 0, 100000));
+      const rank = clampInt(b.rank, 0, MAX_RANK);
+      const boost = 1 + 0.35 * Math.max(rank, user.rank || 0);
+      const money = clampInt(b.money, -1e9, 60000 + days * 15000 * boost + (user.gifted || 0));
+      const earned = Math.max(user.earned || 0, clampInt(b.earned, 0, 100000 + days * 20000 * boost + (user.gifted || 0)));
+      await env.DB.prepare('UPDATE users SET money = ?, days = ?, earned = ?, rank = ?, save = COALESCE(?, save), updated_at = ? WHERE id = ?').bind(money, days, earned, rank, save, now(), user.id).run();
       return json(req, { ok: true, money, days, earned });
     }
     // ---- gifts waiting for this player (sent from the admin panel); claiming them marks them used ----
     if (route === 'gifts' && req.method === 'POST') {
-      const { results } = await env.DB.prepare('UPDATE gifts SET claimed_at = ? WHERE user_id = ? AND claimed_at IS NULL RETURNING id, money, upgrades, from_name, created_at').bind(now(), user.id).all();
-      const gifts = (results || []).map(g => { let up = null; try { up = g.upgrades ? JSON.parse(g.upgrades) : null; } catch (e) { up = null; } return { money: g.money, upgrades: up, from: g.from_name, at: g.created_at }; });
+      const { results } = await env.DB.prepare('UPDATE gifts SET claimed_at = ? WHERE user_id = ? AND claimed_at IS NULL RETURNING id, money, upgrades, action, from_name, created_at').bind(now(), user.id).all();
+      const parse = t => { try { return t ? JSON.parse(t) : null; } catch (e) { return null; } };
+      const gifts = (results || []).sort((a, b) => a.id - b.id).map(g => ({ money: g.money, upgrades: parse(g.upgrades), action: parse(g.action), from: g.from_name, at: g.created_at }));
       return json(req, { gifts });
     }
     // ---- admin panel: only the account named exactly Creater ----
     if (route.startsWith('admin/')) {
       if (user.username !== GUIDE_USER) return fail(req, 'Only the creator can do that.', 403);
       if (route === 'admin/users' && req.method === 'GET') {
-        const { results } = await env.DB.prepare('SELECT username, days, money, earned, updated_at FROM users ORDER BY uname_lc ASC LIMIT 500').all();
-        return json(req, { users: results || [] });
+        const { results } = await env.DB.prepare('SELECT username, days, money, earned, rank, hidden, created_at, updated_at FROM users ORDER BY uname_lc ASC LIMIT 1000').all();
+        return json(req, { users: results || [], config: await getConfig(env) });
       }
-      if (route === 'admin/gift' && req.method === 'POST') {
+      if ((route === 'admin/gift' || route === 'admin/action') && req.method === 'POST') {
         const b = await readBody(req);
         if (!b) return fail(req, 'Bad request.');
-        if (await limited(env, 'gift:' + user.id, 300, 36e5)) return fail(req, 'Slow down a little. Try again in a bit.', 429);
-        const to = await env.DB.prepare('SELECT id, username FROM users WHERE uname_lc = ?').bind(String(b.to || '').trim().toLowerCase()).first();
+        if (await limited(env, 'gift:' + user.id, 600, 36e5)) return fail(req, 'Slow down a little. Try again in a bit.', 429);
+        const to = await env.DB.prepare('SELECT id, username, money, days, earned, rank, hidden FROM users WHERE uname_lc = ?').bind(String(b.to || '').trim().toLowerCase()).first();
         if (!to) return fail(req, 'No player has that name.', 404);
-        const money = clampInt(b.money, 0, 1000000);
-        let upgrades = null;
-        if (b.upgrades === 'max') upgrades = 'max';
-        else if (b.upgrades && typeof b.upgrades === 'object') {
-          upgrades = {};
-          for (const id of UPGRADE_IDS) { const n = clampInt(b.upgrades[id], 0, 10); if (n) upgrades[id] = n; }
-          if (!Object.keys(upgrades).length) upgrades = null;
-        }
-        if (!money && !upgrades) return fail(req, 'Pick some money or an upgrade to send.');
-        await env.DB.batch([
-          env.DB.prepare('INSERT INTO gifts (user_id, money, upgrades, from_name, created_at) VALUES (?, ?, ?, ?, ?)').bind(to.id, money, upgrades ? JSON.stringify(upgrades) : null, user.username, now()),
-          env.DB.prepare('UPDATE users SET gifted = gifted + ? WHERE id = ?').bind(money, to.id),
-        ]);
-        return json(req, { ok: true, to: to.username, money, upgrades });
+        // old style gift: money and upgrades
+        const a0 = b.action || { type: 'gift', money: b.money, upgrades: b.upgrades };
+        const type = String(a0.type || '');
+        const act = { type };
+        const big = 1e12;
+        const sets = []; // board changes that show up right away
+        if (type === 'gift') {
+          act.money = clampInt(a0.money, 0, big);
+          if (a0.upgrades === 'max') act.upgrades = 'max';
+          else if (a0.upgrades && typeof a0.upgrades === 'object') {
+            const up = {};
+            for (const id of UPGRADE_IDS.concat(['u0', 'u1', 'u2', 'u3'])) { const n = clampInt(a0.upgrades[id], 0, 10); if (n) up[id] = n; }
+            if (Object.keys(up).length) act.upgrades = up;
+          }
+          if (!act.money && !act.upgrades) return fail(req, 'Pick some money or an upgrade to send.');
+          if (act.money) sets.push(['money = money + ?', act.money], ['earned = earned + ?', act.money], ['gifted = gifted + ?', act.money]);
+        } else if (type === 'setMoney') {
+          act.value = clampInt(a0.value, -big, big);
+          sets.push(['money = ?', act.value], ['gifted = gifted + ?', Math.max(0, act.value - (to.money || 0))]);
+        } else if (type === 'setEarned') {
+          act.value = clampInt(a0.value, 0, big);
+          sets.push(['earned = ?', act.value], ['gifted = gifted + ?', Math.max(0, act.value - (to.earned || 0))]);
+        } else if (type === 'setDaysPlayed') {
+          act.value = clampInt(a0.value, 0, 100000);
+          sets.push(['days = ?', act.value]);
+        } else if (type === 'setDay') {
+          act.value = clampInt(a0.value, 1, 100000);
+        } else if (type === 'setRank') {
+          act.value = clampInt(a0.value, 0, MAX_RANK);
+          sets.push(['rank = ?', act.value]);
+        } else if (type === 'upgrades') {
+          act.mode = ['max', 'reset', 'add'].includes(a0.mode) ? a0.mode : 'max';
+          if (act.mode === 'add') { act.slot = clampInt(a0.slot, 0, 4); act.n = clampInt(a0.n, 1, 10); }
+        } else if (type === 'unlockAwards') {
+          // nothing extra
+        } else if (type === 'unlockCodes') {
+          act.codes = CODE_WORDS;
+        } else if (type === 'reset') {
+          sets.push(['money = ?', 200], ['days = ?', 0], ['earned = ?', 0], ['rank = ?', 0]);
+        } else if (type === 'hide') {
+          const v = a0.value ? 1 : 0;
+          await env.DB.prepare('UPDATE users SET hidden = ? WHERE id = ?').bind(v, to.id).run();
+          return json(req, { ok: true, to: to.username, hidden: v });
+        } else return fail(req, 'Unknown admin action.');
+        const stmts = [env.DB.prepare('INSERT INTO gifts (user_id, money, upgrades, action, from_name, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(to.id, act.money || 0, null, JSON.stringify(act), user.username, now())];
+        for (const [frag, v] of sets) stmts.push(env.DB.prepare(`UPDATE users SET ${frag} WHERE id = ?`).bind(v, to.id));
+        await env.DB.batch(stmts);
+        return json(req, { ok: true, to: to.username, action: act });
+      }
+      if (route === 'admin/config' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (!b) return fail(req, 'Bad request.');
+        const x = [1, 2, 3, 5].includes(Number(b.payBoost)) ? Number(b.payBoost) : 1;
+        const hours = clampInt(b.hours, 1, 72);
+        const val = x > 1 ? { x, until: now() + hours * 36e5 } : { x: 1, until: 0 };
+        await env.DB.prepare('INSERT INTO config (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at').bind('payBoost', JSON.stringify(val), now()).run();
+        return json(req, { ok: true, config: await getConfig(env) });
       }
       return fail(req, 'Not found.', 404);
     }

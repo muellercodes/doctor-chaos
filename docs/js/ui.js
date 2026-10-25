@@ -23,8 +23,20 @@ export const ICONS = {
   drops: '<svg viewBox="0 0 48 48"><rect x="18" y="4" width="12" height="10" rx="5" fill="#ff5d8f" stroke="#1d2b36" stroke-width="2.5"/><path d="M19 14h10l-2 20h-6z" fill="#bde0fe" stroke="#1d2b36" stroke-width="2.5"/><path d="M24 34v4" stroke="#1d2b36" stroke-width="2.5"/><path d="M24 40q-4 4 0 6q4-2 0-6z" fill="#7fdbff" stroke="#1d2b36" stroke-width="2.5"/></svg>',
   bandage: '<svg viewBox="0 0 48 48"><g transform="rotate(-35 24 24)"><rect x="4" y="16" width="40" height="16" rx="8" fill="#ffcc80" stroke="#1d2b36" stroke-width="2.5"/><rect x="17" y="16" width="14" height="16" fill="#ffe0b2" stroke="#1d2b36" stroke-width="2.5"/><circle cx="21" cy="21" r="1.2" fill="#1d2b36"/><circle cx="27" cy="21" r="1.2" fill="#1d2b36"/><circle cx="21" cy="27" r="1.2" fill="#1d2b36"/><circle cx="27" cy="27" r="1.2" fill="#1d2b36"/></g></svg>',
   xray: '<svg viewBox="0 0 48 48"><rect x="6" y="6" width="36" height="36" rx="4" fill="#1d3557" stroke="#1d2b36" stroke-width="2.5"/><path d="M18 14q6 2 12 0M24 15v20M17 20q7 3 14 0M17 25q7 3 14 0M18 30q6 2 12 0" fill="none" stroke="#bde0fe" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="11" r="3" fill="#bde0fe"/></svg>',
-};
 
+  grill: '<svg viewBox="0 0 48 48"><rect x="6" y="22" width="36" height="16" rx="4" fill="#455a64" stroke="#1d2b36" stroke-width="2.5"/><path d="M12 22v16M20 22v16M28 22v16M36 22v16" stroke="#263238" stroke-width="2.5"/><ellipse cx="24" cy="22" rx="13" ry="5" fill="#8d5524" stroke="#1d2b36" stroke-width="2.5"/><path d="M14 14q2-4 0-8M24 14q2-4 0-8M34 14q2-4 0-8" fill="none" stroke="#90a4ae" stroke-width="2.5" stroke-linecap="round"/></svg>',
+  fryer: '<svg viewBox="0 0 48 48"><path d="M10 20h28l-4 22H14z" fill="#e63946" stroke="#1d2b36" stroke-width="2.5" stroke-linejoin="round"/><path d="M15 20l-2-14M20 20l0-16M25 20l1-15M30 20l3-13M35 20l2-10" stroke="#ffd23f" stroke-width="4" stroke-linecap="round"/><path d="M15 20l-2-14M20 20l0-16M25 20l1-15M30 20l3-13M35 20l2-10" stroke="#1d2b36" stroke-width="1" stroke-linecap="round" opacity="0.4"/><path d="M14 26h20" stroke="#fff" stroke-width="2.5"/></svg>',
+  soda: '<svg viewBox="0 0 48 48"><path d="M13 14h22l-3 30H16z" fill="#e63946" stroke="#1d2b36" stroke-width="2.5" stroke-linejoin="round"/><rect x="11" y="10" width="26" height="5" rx="2" fill="#fff" stroke="#1d2b36" stroke-width="2.5"/><path d="M27 10l4-8" stroke="#1d2b36" stroke-width="3" stroke-linecap="round"/><path d="M16 26h16" stroke="#fff" stroke-width="3"/></svg>',
+  sundae: '<svg viewBox="0 0 48 48"><path d="M15 24h18L24 46z" fill="#e0a458" stroke="#1d2b36" stroke-width="2.5" stroke-linejoin="round"/><ellipse cx="24" cy="22" rx="11" ry="6" fill="#fff6e0" stroke="#1d2b36" stroke-width="2.5"/><ellipse cx="24" cy="15" rx="8" ry="5" fill="#fff6e0" stroke="#1d2b36" stroke-width="2.5"/><path d="M22 10q2-6 4-1" fill="#fff6e0" stroke="#1d2b36" stroke-width="2.5"/></svg>',
+  assemble: '<svg viewBox="0 0 48 48"><path d="M8 20q16-18 32 0z" fill="#e8b064" stroke="#1d2b36" stroke-width="2.5"/><path d="M7 24h34" stroke="#6ab04c" stroke-width="5" stroke-linecap="round"/><rect x="7" y="26" width="34" height="7" rx="3" fill="#6d4321" stroke="#1d2b36" stroke-width="2.5"/><path d="M8 35h32l-3 6H11z" fill="#e0a458" stroke="#1d2b36" stroke-width="2.5" stroke-linejoin="round"/><path d="M9 25l30 0" stroke="#ffd23f" stroke-width="3"/></svg>',};
+
+export const FOOD_TOOLS = [
+  { id: 'grill', label: 'Grill' },
+  { id: 'fryer', label: 'Fryer' },
+  { id: 'soda', label: 'Soda' },
+  { id: 'sundae', label: 'Soft Serve' },
+  { id: 'assemble', label: 'Build Burger' },
+];
 export const TOOLS = [
   { id: 'tweezers', label: 'Tweezers' },
   { id: 'shot', label: 'Syringe' },
@@ -44,6 +56,27 @@ export const TOOLS = [
 const NURSE_SVG = '<svg viewBox="0 0 64 64"><circle cx="32" cy="36" r="20" fill="#c68642"/><path d="M12 34 q0 -22 20 -22 q20 0 20 22 q-4 -12 -20 -12 q-16 0 -20 12z" fill="#2b1d14"/><path d="M16 18 q16 -12 32 0 l-2 6 q-14 -8 -28 0z" fill="#fff" stroke="#1d2b36" stroke-width="2"/><rect x="29" y="12" width="6" height="10" fill="#ff4d5e"/><rect x="27" y="14" width="10" height="6" fill="#ff4d5e"/><circle cx="25" cy="37" r="2.6" fill="#1d2b36"/><circle cx="39" cy="37" r="2.6" fill="#1d2b36"/><path d="M26 45 q6 5 12 0" stroke="#1d2b36" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M21 32 l7 -1.5 M43 32 l-7 -1.5" stroke="#1d2b36" stroke-width="2" stroke-linecap="round"/></svg>';
 
 export const NURSE_VOICE = { id: 'nurse-pat', name: 'Nurse Pat', gender: 'f', age: 'adult', pitch: 1.02 };
+// Buttons that pop up while a finger is still down (mid-drag) stay dead until the finger lifts,
+// plus a short moment, so a drag can never land on them by accident.
+let fingerDown = false, liftedAt = 0;
+window.addEventListener('pointerdown', () => { fingerDown = true; }, true);
+const lift = () => { fingerDown = false; liftedAt = performance.now(); };
+window.addEventListener('pointerup', lift, true);
+window.addEventListener('pointercancel', lift, true);
+export function arm(el, ms = 420) { el.dataset.armShown = String(performance.now()); el.dataset.armMs = String(ms); el.dataset.armDown = fingerDown ? '1' : ''; }
+function blocked(el) {
+  const a = el && el.closest && el.closest('[data-arm-shown]');
+  if (!a) return false;
+  const shown = Number(a.dataset.armShown), ms = Number(a.dataset.armMs);
+  const now = performance.now();
+  if (now - shown < ms) return true;
+  // the finger that was down when it appeared has to lift first
+  if (a.dataset.armDown && (fingerDown ? liftedAt < shown : false)) return true;
+  if (a.dataset.armDown && liftedAt >= shown && now - liftedAt < 120) return true;
+  return false;
+}
+window.addEventListener('click', e => { if (blocked(e.target)) { e.stopPropagation(); e.preventDefault(); } }, true);
+
 export function createUI(root, E) {
   const ui = { talk: { speed: 1, hold: 1 } };
   const layer = (cls) => { const el = h('div', cls); root.appendChild(el); return el; };
@@ -87,12 +120,24 @@ export function createUI(root, E) {
   };
 
   // ---------- bubbles ----------
+  // Over the 3D scene the bubble floats above the speaker's head. During a procedure (ui.dock = true)
+  // bubbles move to a corner so they never cover what you are working on.
   const bubbles = layer('bubbles');
+  const dock = h('div', 'bubble-dock'); root.appendChild(dock);
+  ui.dock = false;
   const live = new Set();
+  const waiting = new Set();
   E.onUpdate(() => {
     const W = root.clientWidth;
+    // keep the dock clear of the hint banner
+    if (dock.childElementCount) {
+      const hr = !hint.classList.contains('hidden') ? hint.getBoundingClientRect() : null;
+      const rr = root.getBoundingClientRect();
+      const top = hr && hr.left < rr.left + Math.min(340, W * 0.45) ? hr.bottom - rr.top + 8 : 62;
+      dock.style.top = Math.max(62, top) + 'px';
+    }
     for (const b of live) {
-      if (!b.anchor) continue;
+      if (!b.anchor || b.docked) continue;
       const p = E.toScreen(b.anchor());
       const bw = b.el.offsetWidth;
       const x = Math.max(bw / 2 + 8, Math.min(W - bw / 2 - 8, p.x));
@@ -103,11 +148,13 @@ export function createUI(root, E) {
   });
   ui.say = (anchor, text, o = {}) => {
     if (o.key) for (const b of [...live]) if (b.key === o.key) b.kill();
-    const el = h('div', 'bubble' + (o.cls ? ' ' + o.cls : ''));
+    const docked = ui.dock && !o.float;
+    const el = h('div', 'bubble' + (o.cls ? ' ' + o.cls : '') + (docked ? ' docked' : ''));
     if (o.name) el.appendChild(h('div', 'bubble-name', o.name));
     const tx = h('div', 'bubble-text'); el.appendChild(tx);
-    bubbles.appendChild(el);
-    const b = { el, anchor, key: o.key };
+    (docked ? dock : bubbles).appendChild(el);
+    if (docked) while (dock.childElementCount > 2) dock.firstElementChild.remove();
+    const b = { el, anchor, key: o.key, docked };
     let killed = false;
     b.kill = () => { if (killed) return; killed = true; live.delete(b); el.classList.add('out'); setTimeout(() => el.remove(), 250); };
     live.add(b);
@@ -118,32 +165,39 @@ export function createUI(root, E) {
     const speed = (o.fast ? 90 : 55) * ui.talk.speed;
     return new Promise(res => {
       const total = text.length;
+      let done = false, holdT = null;
+      const end = () => { if (done) return; done = true; clearInterval(iv); clearTimeout(holdT); waiting.delete(w); if (!o.persist) b.kill(); res(b); };
+      // tapping skips a line (outside of procedures)
+      const w = { skip() { tx.textContent = text; if (spoken) spoken.skip(); end(); } };
+      if (!o.persist) waiting.add(w);
       const iv = setInterval(() => {
         i = Math.min(total, i + Math.max(1, Math.round(speed / 30)));
         tx.textContent = text.slice(0, i);
         if (i >= total) {
           clearInterval(iv);
           const hold = (o.hold !== undefined ? o.hold : 1.2 + total * 0.035) * ui.talk.hold;
-          if (o.persist) { res(b); return; }
+          if (o.persist) { waiting.delete(w); res(b); return; }
           if (spoken) {
-            // stay up until the voice finishes the line (plus a short beat)
+            // stay up until the voice finishes (the voice has its own time limits), then a short beat
             const t0 = performance.now();
-            spoken.done.then(() => { const left = Math.max(0.35 * 1000, hold * 1000 - (performance.now() - t0)); setTimeout(() => { b.kill(); res(b); }, Math.min(left, 900)); });
+            spoken.done.then(() => { const left = Math.max(350, hold * 1000 - (performance.now() - t0)); holdT = setTimeout(end, Math.min(left, 700)); });
             return;
           }
-          setTimeout(() => { b.kill(); res(b); }, hold * 1000);
+          holdT = setTimeout(end, hold * 1000);
         }
       }, 33);
       b.finish = () => { clearInterval(iv); tx.textContent = text; };
     });
   };
-  ui.clearBubbles = () => { for (const b of [...live]) b.kill(); };
+  ui.skipLines = () => { const n = waiting.size; for (const w of [...waiting]) w.skip(); return n; };
+  ui.clearBubbles = () => { for (const b of [...live]) b.kill(); dock.innerHTML = ''; };
 
   // ---------- nurse ----------
   const nurse = layer('nurse hidden interactive');
   const nAvatar = h('div', 'nurse-avatar', NURSE_SVG);
   const nBody = h('div', 'nurse-body');
   const nName = h('div', 'nurse-name', 'Nurse Pat');
+  ui.setNurseName = n => { nName.textContent = n; };
   const nText = h('div', 'nurse-text');
   const nBtn = h('button', 'btn small', 'Next');
   nBody.append(nName, nText);
@@ -154,6 +208,7 @@ export function createUI(root, E) {
   window.addEventListener('keydown', e => { if ((e.code === 'Enter' || e.code === 'Space') && nurseResolve && !nurse.classList.contains('hidden') && !nBtn.classList.contains('hidden')) { e.preventDefault(); nurseNext(); } });
   ui.nurse = (text, o = {}) => {
     nurse.classList.remove('hidden');
+    arm(nurse, 380);
     nText.innerHTML = text;
     if (!speak(text, NURSE_VOICE)) sfx.babble(text.replace(/<[^>]+>/g, ''), 1.25);
     const wait = o.wait !== false;
@@ -172,13 +227,22 @@ export function createUI(root, E) {
     chart.innerHTML = '';
     chart.append(
       h('div', 'chart-clip'),
-      h('div', 'chart-title', 'PATIENT CHART'),
+      h('div', 'chart-title', ui.food ? 'ORDER TICKET' : 'PATIENT CHART'),
       h('div', 'chart-row', `<b>Name:</b> ${c.name}`),
-      h('div', 'chart-row', `<b>Age:</b> ${c.ageLabel}`),
-      h('div', 'chart-row complaint', `<b>Complaint:</b> “${c.complaint}”`),
+      ...(ui.food ? [] : [h('div', 'chart-row', `<b>Age:</b> ${c.ageLabel}`)]),
+      h('div', 'chart-row complaint', `<b>${ui.food ? 'Order' : 'Complaint'}:</b> “${c.complaint}”`),
     );
+    if (o.tools && o.tools.length) {
+      const box = h('div', 'chart-tools');
+      box.appendChild(h('div', 'chart-tools-title', ui.food ? (o.tools.length > 1 ? 'Stations (in order)' : 'Station') : o.tools.length > 1 ? 'Tools needed (in order)' : 'Tool needed'));
+      o.tools.forEach((t, k) => {
+        const label = (TOOLS.concat(FOOD_TOOLS).find(x => x.id === t) || { label: t }).label;
+        const st = k < (o.current || 0) ? 'done' : k === (o.current || 0) ? 'now' : '';
+        box.appendChild(h('div', 'chart-tool ' + st, `${ICONS[t] || ''}<span>${o.tools.length > 1 ? k + 1 + '. ' : ''}${label}</span>${st === 'done' ? icon('check', 'in') : ''}`));
+      });
+      chart.append(box);
+    }
     if (o.note) chart.append(h('div', 'chart-note', `${icon('pencil', 'in')} <b>Nurse's note:</b> ${o.note}`));
-    if (c.steps.length > 1) chart.append(h('div', 'chart-row small', `Needs ${c.steps.length} things today.`));
     chart.classList.remove('hidden');
     chart.classList.remove('min');
   };
@@ -203,7 +267,7 @@ export function createUI(root, E) {
     head.onclick = () => { if (trayMin) { sfx.click(); setTrayMin(false); } };
     tray.classList.toggle('min', trayMin && !o.highlight);
     const row = h('div', 'tray-row');
-    for (const t of TOOLS) {
+    for (const t of (ui.food ? FOOD_TOOLS : TOOLS)) {
       const b = h('button', 'tool interactive' + (o.highlight === t.id ? ' glow' : ''), `${ICONS[t.id]}<span>${t.label}</span>`);
       b.dataset.tool = t.id;
       b.onclick = () => { sfx.click(); res(t.id); };
@@ -211,6 +275,7 @@ export function createUI(root, E) {
     }
     tray.appendChild(row);
     tray.classList.remove('hidden');
+    arm(tray, 450);
   });
   ui.hideTray = () => tray.classList.add('hidden');
   ui.shakeTray = () => { tray.classList.remove('shake'); void tray.offsetWidth; tray.classList.add('shake'); };
@@ -296,6 +361,7 @@ export function createUI(root, E) {
     card.appendChild(row);
     modal.appendChild(card);
     modal.classList.remove('hidden');
+    arm(card, 380);
     const first = row.querySelector('.btn.primary') || row.querySelector('.btn');
     setTimeout(() => first && first.focus(), 50);
   });

@@ -81,6 +81,7 @@ export async function play(G, P) {
   cleanM.remove(); wipe.visible = false; sfx.good(); ui.popAt(center(), 'Clean!', 'good');
   // ---- 2: ointment ----
   G.dbg.phase = 'ointment';
+  E.input.requireRelease();
   ui.hint('<b>Hold</b> to squeeze the ointment. Let go in the <b>green</b>.');
   const tube = new THREE.Group();
   const tb = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.08, 12), toon('#ffffff')); tube.add(tb);
@@ -116,6 +117,7 @@ export async function play(G, P) {
   ointM.remove(); tube.visible = false; sfx.good();
   // ---- 3: bandage ----
   G.dbg.phase = 'stick';
+  E.input.requireRelease();
   ui.hint('The bandage wiggles. <b>Click</b> when it lines up with the dotted outline!');
   const band = bandageProp(G.bandageColor || '#ffcc80'); band.scale.setScalar(s * 1.6); S.add(band);
   const ghostMat = new THREE.LineDashedMaterial({ color: '#ffffff', dashSize: 0.006, gapSize: 0.005, depthTest: false }); ghostMat.userData.dispose = true;

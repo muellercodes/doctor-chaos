@@ -50,7 +50,7 @@ export async function play(G, P) {
   const elbowNow = () => { const o = origin(); return { x: o.x + sk.elL[0] * SC + ox, y: o.y + sk.elL[1] * SC + oy }; };
   const onDown = () => {
     const p = A.pointer(), e = elbowNow();
-    if (phase === 'aim' && p.has && Math.hypot(p.x - e.x, p.y - e.y) < 15) {
+    if (phase === 'aim' && p.has && Math.hypot(p.x - e.x, p.y - e.y) < (window.matchMedia('(pointer: coarse)').matches ? 26 : 16)) {
       funny++; sfx.giggle(0, 1.2 + funny * 0.15);
       if (funny === 3) { funnyMsg = 3.5; if (G.ach) G.ach('funny_bone'); }
       return;
@@ -96,7 +96,7 @@ export async function play(G, P) {
       if (resultT > 1.8) {
         if (result === 'good') return { ok: true };
         if (tries >= 3) return { ok: false };
-        phase = 'aim'; blurShot = null;
+        phase = 'aim'; blurShot = null; E.input.requireRelease(300);
       }
     }
     // ---------- draw ----------

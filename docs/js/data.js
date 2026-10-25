@@ -503,18 +503,23 @@ const ALL_STEPS = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'ca
 export function generateDay(day, opts = {}) {
   const used = opts.used || new Set();
   const rank = opts.rank || 0;
-  const n = rank >= 4 ? 6 : 5;
-  const ages = shuffle(['kid', 'adult', pick(['teen', 'elder']), pick(['kid', 'adult', 'elder']), pick(['adult', 'teen', 'kid']), pick(['adult', 'elder', 'kid'])]).slice(0, n);
+  const n = opts.n || 5;
+  let ages = shuffle(['kid', 'adult', pick(['teen', 'elder']), pick(['kid', 'adult', 'elder']), pick(['adult', 'teen', 'kid']), pick(['adult', 'elder', 'kid'])]).slice(0, n);
+  // departments see more of some ages (pediatrics: kids, geriatrics: grandparents)
+  if (opts.ageBias) { const [want, w] = Object.entries(opts.ageBias)[0]; ages = ages.map(a => (Math.random() < w / (w + 2) ? want : a)); }
   const genders = shuffle(['m', 'f', 'm', 'f', pick(['m', 'f']), pick(['m', 'f'])]).slice(0, n);
   const slots = new Array(n).fill(null);
   const free = shuffle([...Array(n - 1).keys()].map(i => i + 1));
   if (opts.special) slots[free.pop()] = { type: 'special', s: opts.special };
   if (opts.persona) slots[free.pop()] = { type: 'persona', p: opts.persona };
-  const steps = shuffle(ALL_STEPS);
+  // weighted shuffle: a department's favorite procedures come up more often
+  const bias = opts.stepBias || {};
+  const steps = ALL_STEPS.map(st => ({ st, k: Math.pow(Math.random(), 1 / (bias[st] || 1)) })).sort((a, b) => b.k - a.k).map(x => x.st);
+  if (Object.keys(bias).length) for (const [st, w] of Object.entries(bias)) for (let k = 1; k < w; k++) steps.splice(Math.floor(Math.random() * Math.min(steps.length, 4)), 0, st);
   const out = [];
   let si = 0;
   // promoted doctors see more patients with two problems at once
-  const twoChance = Math.min(0.7, 0.3 + 0.1 * rank);
+  const twoChance = opts.twoChance != null ? opts.twoChance : Math.min(0.7, 0.3 + 0.1 * rank);
   for (let i = 0; i < n; i++) {
     const slot = slots[i];
     const ag = ages[i], g = genders[i];

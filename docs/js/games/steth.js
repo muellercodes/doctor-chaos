@@ -126,6 +126,7 @@ export async function play(G, P, prm = {}) {
   }
   let taps = [];
   G.dbg.phase = 'rhythm'; G.dbg.notes = notes;
+  E.input.requireRelease();
   const tapFn = () => taps.push(E.time);
   S.on('down', tapFn);
   S.key((e, down) => { if (down && e.code === 'Space' && !e.repeat) tapFn(); });

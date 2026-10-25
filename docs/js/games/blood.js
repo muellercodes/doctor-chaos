@@ -83,6 +83,7 @@ export async function play(G, P, prm = {}) {
   ui.hint('Move the <b>Vein Finder</b> light around. <b>Click the BIG blue vein!</b>');
   let misses = 0, quality = 0, hit = null, failed = false;
   G.dbg.phase = 'vein'; G.dbg.vein = veins[0].pts[30];
+  E.input.requireRelease();
   const maxMiss = G.tutorial ? 99 : 3;
   let pending = null;
   S.on('down', () => { pending = E.pointerOnPlane(plane); });
@@ -135,6 +136,7 @@ export async function play(G, P, prm = {}) {
   ui.hint('<b>Hold</b> to fill the tube. <b>Let go</b> between the two lines!');
   let f = 0, holdT = 0, over = false, remarked = false, done = false;
   G.dbg.phase = 'fill'; G.dbg.f = () => f; G.dbg.zone = [zLo, zHi]; G.dbg.hit = hit;
+  E.input.requireRelease();
   person.expr('scared');
   await new Promise(res => {
     S.on('up', () => { if (f >= zLo && !done) { done = true; } });

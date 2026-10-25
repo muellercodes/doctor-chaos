@@ -62,13 +62,19 @@ export function buildRoom(scene) {
   R.sun = sun;
 
   // ---------- floor & walls ----------
-  const floorTex = canvasTexture(256, 256, (ctx, W, H) => {
+  // speckled vinyl tiles like a real clinic floor
+  const floorTex = canvasTexture(512, 512, (ctx, W, H) => {
     const n = 4, s = W / n;
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-      ctx.fillStyle = (i + j) % 2 ? '#e6f4f0' : '#cfe8e2';
+      ctx.fillStyle = (i + j) % 2 ? '#e3f1ed' : '#d3e8e2';
       ctx.fillRect(i * s, j * s, s, s);
     }
-    ctx.strokeStyle = 'rgba(80,120,115,0.25)'; ctx.lineWidth = 3;
+    for (let k = 0; k < 5200; k++) {
+      const c = Math.random();
+      ctx.fillStyle = c < 0.4 ? 'rgba(90,120,115,0.22)' : c < 0.7 ? 'rgba(255,255,255,0.55)' : c < 0.85 ? 'rgba(120,150,170,0.25)' : 'rgba(170,140,120,0.2)';
+      ctx.fillRect(Math.random() * W, Math.random() * H, 1 + Math.random() * 2.2, 1 + Math.random() * 2.2);
+    }
+    ctx.strokeStyle = 'rgba(80,120,115,0.3)'; ctx.lineWidth = 2;
     for (let i = 0; i <= n; i++) { ctx.beginPath(); ctx.moveTo(i * s, 0); ctx.lineTo(i * s, H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i * s); ctx.lineTo(W, i * s); ctx.stroke(); }
   }).tex;
   floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
@@ -79,9 +85,22 @@ export function buildRoom(scene) {
   scene.add(floor);
 
   const wallC = '#dff3ee', wainC = '#9fd8cc', trimC = '#ff8a2a';
-  const back = box(9.4, 3.6, 0.1, wallC, 0, 1.8, -2.65, false); scene.add(back);
-  const left = box(0.1, 3.6, 7.5, wallC, -4.65, 1.8, 0.9, false); scene.add(left);
-  const right = box(0.1, 3.6, 7.5, wallC, 4.65, 1.8, 0.9, false); scene.add(right);
+  const wallTex = canvasTexture(256, 256, (ctx, W, H) => {
+    ctx.fillStyle = wallC; ctx.fillRect(0, 0, W, H);
+    for (let k = 0; k < 2600; k++) { ctx.fillStyle = Math.random() < 0.5 ? 'rgba(0,40,30,0.035)' : 'rgba(255,255,255,0.08)'; ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2); }
+  }).tex;
+  wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(4, 2);
+  const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.92 });
+  const back = box(9.4, 3.6, 0.1, wallMat, 0, 1.8, -2.65, false); scene.add(back);
+  const left = box(0.1, 3.6, 7.5, wallMat, -4.65, 1.8, 0.9, false); scene.add(left);
+  const right = box(0.1, 3.6, 7.5, wallMat, 4.65, 1.8, 0.9, false); scene.add(right);
+  // baseboards
+  scene.add(box(9.4, 0.1, 0.03, '#7fb8ad', 0, 0.05, -2.57, false));
+  scene.add(box(0.03, 0.1, 7.5, '#7fb8ad', -4.57, 0.05, 0.9, false));
+  scene.add(box(0.03, 0.1, 7.5, '#7fb8ad', 4.57, 0.05, 0.9, false));
+  // ceiling light panels (they glow a little)
+  const panelMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff8e8', emissiveIntensity: 0.9 });
+  for (const [x, z] of [[-1.6, -0.6], [1.6, -0.6], [-1.6, 1.4], [1.6, 1.4]]) { const pnl = box(1.1, 0.04, 0.55, panelMat, x, 3.58, z, false); scene.add(pnl); scene.add(box(1.16, 0.03, 0.61, '#cfd8dc', x, 3.6, z, false)); }
   scene.add(box(9.4, 1.0, 0.04, wainC, 0, 0.5, -2.59, false));
   scene.add(box(0.04, 1.0, 7.5, wainC, -4.59, 0.5, 0.9, false));
   scene.add(box(0.04, 1.0, 7.5, wainC, 4.59, 0.5, 0.9, false));
@@ -255,6 +274,32 @@ export function buildRoom(scene) {
   tray.add(box(0.55, 0.05, 0.02, '#b0bec5', 0, 0.96, -0.19));
   scene.add(tray);
   R.trayTop = new THREE.Vector3(1.3, 0.97, 0.6);
+  // things on the tray: gauze pads, a cotton ball jar, tongue depressors, a kidney dish
+  tray.add(box(0.1, 0.012, 0.1, '#ffffff', -0.17, 0.955, -0.08));
+  tray.add(box(0.1, 0.012, 0.1, '#f7f7f7', -0.16, 0.967, -0.07));
+  tray.add(cyl(0.035, 0.035, 0.09, new THREE.MeshStandardMaterial({ color: '#e0f7fa', transparent: true, opacity: 0.4, roughness: 0.05 }), 0.05, 0.99, -0.08, 14));
+  for (let i = 0; i < 6; i++) tray.add(box(0.012, 0.12, 0.003, '#e8d2a6', 0.05 + (i - 2.5) * 0.008, 1.03, -0.08 + (i % 2) * 0.006));
+  const dish = new THREE.Mesh(new THREE.SphereGeometry(0.09, 18, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), toon('#cfd8dc')); dish.scale.set(1.3, 0.35, 0.7); dish.position.set(0.15, 0.98, 0.07); tray.add(dish);
+
+  // ---------- clinic details: rolling stool, step stool, wall dispensers, sharps box ----------
+  const stool = new THREE.Group(); stool.position.set(-0.75, 0, -0.9);
+  stool.add(cyl(0.2, 0.2, 0.07, '#37474f', 0, 0.55, 0, 20));
+  stool.add(cyl(0.025, 0.025, 0.45, '#90a4ae', 0, 0.3, 0, 10));
+  for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; const leg = box(0.26, 0.025, 0.04, '#78909c', Math.cos(a) * 0.12, 0.07, Math.sin(a) * 0.12); leg.rotation.y = -a; stool.add(leg); stool.add(sph(0.03, '#263238', Math.cos(a) * 0.25, 0.03, Math.sin(a) * 0.25, 10)); }
+  scene.add(stool);
+  const step = new THREE.Group(); step.position.set(-0.62, 0, 0.58);
+  step.add(box(0.42, 0.22, 0.3, '#cfd8dc', 0, 0.11, 0)); step.add(box(0.44, 0.02, 0.32, '#37474f', 0, 0.225, 0));
+  scene.add(step);
+  // pillow at the head of the table
+  const pillow = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.32, 6, 14), toon('#ffffff', { roughness: 0.9 })); pillow.rotation.z = Math.PI / 2; pillow.scale.set(0.45, 1, 1); pillow.position.set(-0.85, TABLE_TOP + 0.05, 0); scene.add(pillow);
+  // glove boxes, sanitizer and a red sharps box on the back wall by the curtain
+  const wallKit = new THREE.Group(); wallKit.position.set(0.95, 0, -2.56);
+  for (const [i, c] of [[0, '#7e57c2'], [1, '#42a5f5'], [2, '#26a69a']]) { wallKit.add(box(0.24, 0.12, 0.1, '#ffffff', -0.55 + i * 0.27, 1.17, 0.05)); wallKit.add(box(0.22, 0.03, 0.005, c, -0.55 + i * 0.27, 1.19, 0.101)); wallKit.add(box(0.1, 0.025, 0.006, '#e3f2fd', -0.55 + i * 0.27, 1.15, 0.102)); }
+  wallKit.add(box(0.12, 0.2, 0.09, '#eceff1', -2.12, 1.45, 0.045)); wallKit.add(box(0.05, 0.05, 0.03, '#90a4ae', -2.12, 1.33, 0.07));
+  wallKit.add(box(0.2, 0.26, 0.14, '#e53935', 0.0, 0.75, 0.07)); wallKit.add(box(0.21, 0.05, 0.15, '#ffd54f', 0.0, 0.9, 0.07));
+  scene.add(wallKit);
+  // outlet and light switch
+  scene.add(box(0.07, 0.11, 0.015, '#ffffff', 2.55, 1.15, -2.58)); scene.add(box(0.07, 0.11, 0.015, '#ffffff', -0.9, 0.35, -2.58));
 
   // ================= HIDING SPOTS =================
   const spot = (id, label, group, anchor, extra) => { R.spots[id] = { id, label, group, anchor, ...extra }; scene.add(group); return R.spots[id]; };
@@ -362,5 +407,56 @@ export function buildRoom(scene) {
     s.fake = 'Packing peanuts. And one confused hamster.';
   }
 
+  // ---------- fast food mode (after promotion 100) ----------
+  // A counter, menu boards and a soda machine roll in; the exam room becomes "Doctor Burger".
+  let food = null;
+  function buildFood() {
+    const g = new THREE.Group();
+    // the counter customers stand behind
+    const front = canvasTexture(512, 160, (ctx, W, H) => {
+      ctx.fillStyle = '#e63946'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(0, 18, W, 14); ctx.fillRect(0, H - 32, W, 14);
+      ctx.fillStyle = '#fff'; ctx.font = '700 64px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('DOCTOR BURGER', W / 2, H / 2 + 2);
+    }).tex;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.95, 0.5), [toon('#c62f3b'), toon('#c62f3b'), toon('#ffffff'), toon('#c62f3b'), new THREE.MeshStandardMaterial({ map: front }), toon('#c62f3b')]);
+    body.position.set(0, 0.475, 1.5); body.castShadow = true; body.receiveShadow = true; g.add(body);
+    g.add(box(3.5, 0.06, 0.6, '#f4f4f0', 0, 0.97, 1.5));
+    // register
+    const reg = new THREE.Group(); reg.position.set(1.15, 1.0, 1.45);
+    reg.add(box(0.36, 0.14, 0.32, '#37474f', 0, 0.07, 0));
+    const scr = box(0.3, 0.2, 0.03, '#263238', 0, 0.27, -0.05); scr.rotation.x = -0.3; reg.add(scr);
+    reg.add(box(0.26, 0.15, 0.005, '#7fdbff', 0, 0.272, -0.035).rotateX(-0.3));
+    g.add(reg);
+    // ketchup, mustard, napkins
+    g.add(cyl(0.04, 0.045, 0.2, '#e63946', 1.55, 1.1, 1.4, 12)); g.add(cyl(0.012, 0.03, 0.05, '#e63946', 1.55, 1.22, 1.4, 8));
+    g.add(cyl(0.04, 0.045, 0.2, '#ffd23f', 1.62, 1.1, 1.55, 12)); g.add(cyl(0.012, 0.03, 0.05, '#ffd23f', 1.62, 1.22, 1.55, 8));
+    g.add(box(0.2, 0.16, 0.12, '#cfd8dc', 0.7, 1.08, 1.4));
+    // soda machine at the end of the counter
+    const soda = new THREE.Group(); soda.position.set(-1.45, 1.0, 1.4);
+    soda.add(box(0.5, 0.7, 0.4, '#e63946', 0, 0.35, 0));
+    soda.add(box(0.42, 0.22, 0.02, '#fff8e1', 0, 0.52, 0.21));
+    for (const x of [-0.13, 0, 0.13]) soda.add(cyl(0.02, 0.02, 0.06, '#90a4ae', x, 0.25, 0.18, 8));
+    g.add(soda);
+    // menu boards over the posters
+    const menu = (title, rows) => canvasTexture(512, 600, (ctx, W, H) => {
+      ctx.fillStyle = '#1d2b36'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 14; ctx.strokeRect(7, 7, W - 14, H - 14);
+      ctx.fillStyle = '#ffd23f'; ctx.font = '700 60px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.fillText(title, W / 2, 86);
+      ctx.font = '600 40px Fredoka, Arial';
+      rows.forEach(([a, b], i) => { ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.fillText(a, 40, 170 + i * 82); ctx.fillStyle = '#7be495'; ctx.textAlign = 'right'; ctx.fillText(b, W - 40, 170 + i * 82); });
+    }).tex;
+    const m1 = planeTex(0.66, 0.78, menu('MENU', [['Burger', '$4'], ['Fries', '$2'], ['Soda', '$1'], ['Ice cream', '$2'], ['Doctor Meal', '$7']]), 1.25, 1.62, -2.57);
+    const m2 = planeTex(0.72, 0.84, menu('SPECIALS', [['The Cast Iron', '$9'], ['Stitches Fries', '$3'], ['X-Ray Shake', '$4'], ['Pill-ow Pie', '$3']]), -2.55, 1.55, -2.57);
+    g.add(m1, m2);
+    const sign = planeTex(0.5, 0.18, textPoster([{ text: 'KITCHEN', size: 64, bold: true, color: '#fff' }], { bg: '#e63946', border: '#1d2b36', w: 512, h: 184 }), doorX, 2.42, -2.575);
+    g.add(sign);
+    g.traverse(o => { if (o.isMesh) o.userData.food = true; });
+    return g;
+  }
+  R.setFood = on => {
+    if (on && !food) { food = buildFood(); scene.add(food); }
+    if (food) food.visible = !!on;
+    exitSign.visible = !on;
+  };
   return R;
 }

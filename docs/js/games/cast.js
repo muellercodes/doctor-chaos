@@ -183,6 +183,7 @@ export async function play(G, P) {
   full.rotateY(Math.PI);
   S.add(full);
   G.dbg.phase = 'sign'; G.dbg.cast = full.position.clone();
+  E.input.requireRelease();
   ui.hint('Sign the cast! <b>Draw on it</b>, then press Done.');
   G.say(pick(['Draw something cool on it!', 'Sign it! Make it look like a dragon did it.', 'Can you draw a cat? I love cats.']), { key: 'c', hold: 1 });
   const ink = '#1d2b36';

@@ -55,6 +55,21 @@ function limbGeo(r1, r2, len, seg = 14) {
   return new THREE.LatheGeometry(pts, seg);
 }
 const limb = (r1, r2, len, color) => mesh(limbGeo(r1, r2, len), color);
+// a limb with a muscle bulge: radius r1 at the top, swelling to rm at "at" (0 top .. 1 bottom), r2 at the bottom
+function muscleGeo(r1, rm, r2, len, at = 0.3, seg = 18) {
+  const pts = [], n = 16;
+  // rounded bottom cap
+  for (let i = 0; i <= 5; i++) { const a = (Math.PI / 2) * (i / 5); pts.push(new THREE.Vector2(Math.max(0.0001, r2 * Math.sin(a)), -len / 2 - r2 * Math.cos(a))); }
+  for (let i = 1; i < n; i++) {
+    const t = 1 - i / n; // 1 at the bottom .. 0 at the top
+    const bulge = Math.exp(-Math.pow((t - at) / 0.32, 2));
+    const base = r1 + (r2 - r1) * t;
+    pts.push(new THREE.Vector2(base + (rm - Math.max(r1, r2) * 0.98) * bulge, len / 2 - t * len));
+  }
+  for (let i = 0; i <= 5; i++) { const a = (Math.PI / 2) * (1 - i / 5); pts.push(new THREE.Vector2(Math.max(0.0001, r1 * Math.sin(a)), len / 2 + r1 * Math.cos(a))); }
+  return new THREE.LatheGeometry(pts, seg);
+}
+const muscle = (r1, rm, r2, len, color, at) => mesh(muscleGeo(r1, rm, r2, len, at), color);
 const lathe = (prof, color, seg = 22) => mesh(new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(Math.max(0.0001, r), y)), seg), color);
 
 // ---------------- materials that look like real stuff ----------------
@@ -205,25 +220,25 @@ export class Person {
       const sx = side === 'L' ? 1 : -1;
       const sh = j['sh' + side] = new THREE.Group(); sh.position.set(sx * 0.215 * wide, 0.52, 0); j.spine.add(sh);
       const cap = sphere(0.056, shirtMat, 14); cap.position.y = -0.03; cap.scale.set(0.95, 0.8, 0.92); sh.add(cap);
-      const ua = limb(0.054, 0.047, 0.19, longSleeves ? shirtMat : toon(skin)); ua.position.y = -0.13; sh.add(ua);
+      const ua = muscle(0.052, 0.056, 0.045, 0.19, longSleeves ? shirtMat : toon(skin), 0.28); ua.position.y = -0.13; sh.add(ua);
       if (!longSleeves) {
         const slv = mesh(new THREE.CylinderGeometry(0.059, 0.058, 0.1, 16, 1, true), shirtMat); slv.position.y = -0.03; sh.add(slv);
         const hem = mesh(new THREE.TorusGeometry(0.058, 0.007, 5, 18), shirtDark); hem.rotation.x = Math.PI / 2; hem.position.y = -0.08; hem.castShadow = false; sh.add(hem);
       }
       const el = j['el' + side] = new THREE.Group(); el.position.y = -0.27; sh.add(el);
       const elb = sphere(0.046, longSleeves ? shirtMat : toon(skin), 12); el.add(elb);
-      const fa = limb(0.046, 0.037, 0.17, longSleeves ? shirtMat : toon(skin)); fa.position.y = -0.12; el.add(fa);
+      const fa = muscle(0.044, 0.049, 0.033, 0.17, longSleeves ? shirtMat : toon(skin), 0.22); fa.position.y = -0.12; el.add(fa);
       if (longSleeves) { const cuff = mesh(new THREE.CylinderGeometry(0.043, 0.043, 0.035, 14), shirtDark); cuff.position.y = -0.205; el.add(cuff); }
       const hand = this.buildHand(skin, sx); hand.position.y = -0.255; el.add(hand);
       this['elbow' + side] = elb; this['cuff' + side] = longSleeves ? el.children[el.children.length - 2] : null;
       this['upperArm' + side] = ua; this['forearm' + side] = fa; this['hand' + side] = hand;
       // legs
       const hip = j['hip' + side] = new THREE.Group(); hip.position.set(sx * 0.095 * wide, -0.02, 0); this.body.add(hip);
-      const th = limb(0.08 * Math.sqrt(wide), 0.066, 0.27, pantsMat); th.position.y = -0.19; hip.add(th);
+      const th = muscle(0.082 * Math.sqrt(wide), 0.086 * Math.sqrt(wide), 0.062, 0.27, pantsMat, 0.3); th.position.y = -0.19; hip.add(th);
       const kn = j['kn' + side] = new THREE.Group(); kn.position.y = -0.4; hip.add(kn);
       const shinMat = spec.shorts ? toon(skin) : pantsMat;
       const kc = sphere(0.064, shinMat, 14); kc.position.set(0, -0.004, 0.004); kn.add(kc);
-      const sn = limb(0.064, 0.047, 0.27, shinMat); sn.position.y = -0.19; kn.add(sn);
+      const sn = muscle(0.058, 0.066, 0.043, 0.27, shinMat, 0.3); sn.position.y = -0.19; kn.add(sn);
       if (spec.shorts) {
         const leg = mesh(new THREE.CylinderGeometry(0.085, 0.082, 0.1, 16, 1, true), pantsMat); leg.position.y = -0.36; hip.add(leg);
         const sock = mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.07, 12), spec.socks || '#ffffff'); sock.position.y = -0.35; kn.add(sock);

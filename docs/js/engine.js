@@ -98,8 +98,14 @@ export function createEngine(canvas) {
   const tweens = new Set();
 
   // ---------- input ----------
+  // Drag-safe input: after a phase change (requireRelease), a finger that is still down from the
+  // last phase does not count until it lifts, and a new press in the next moment is ignored too,
+  // so the end of a scrub can never turn into an accidental click.
   const input = {
-    x: 0, y: 0, cx: 0, cy: 0, down: false, has: false,
+    x: 0, y: 0, cx: 0, cy: 0, has: false, _down: false, stale: false, blockUntil: 0,
+    get down() { return this._down && !this.stale; },
+    set down(v) { this._down = v; },
+    requireRelease(ms = 380) { if (this._down) this.stale = true; this.blockUntil = performance.now() + ms; },
     listeners: { down: new Set(), up: new Set(), move: new Set() },
     keys: new Set(), keyListeners: new Set(),
   };
@@ -112,12 +118,19 @@ export function createEngine(canvas) {
     input.has = true;
   }
   canvas.addEventListener('pointerdown', e => {
-    setPointer(e); input.down = true;
+    setPointer(e); input._down = true;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    if (performance.now() < input.blockUntil) { input.stale = true; return; }
+    input.stale = false;
     for (const f of [...input.listeners.down]) f(e);
   });
   canvas.addEventListener('pointermove', e => { setPointer(e); for (const f of [...input.listeners.move]) f(e); });
-  const up = e => { if (!input.down) return; setPointer(e); input.down = false; for (const f of [...input.listeners.up]) f(e); };
+  const up = e => {
+    if (!input._down) return;
+    setPointer(e); input._down = false;
+    if (input.stale) { input.stale = false; return; }
+    for (const f of [...input.listeners.up]) f(e);
+  };
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
