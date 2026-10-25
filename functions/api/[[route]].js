@@ -2,6 +2,9 @@
 // Runs as a Cloudflare Pages Function with a D1 database bound as DB.
 // No email or personal info is collected: just a username and a password.
 import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'obscenity';
+import { GUIDE } from '../../lib/guide.js';
+
+const GUIDE_USER = 'Creater'; // exact spelling and capitals
 
 const ALLOWED_ORIGINS = ['https://muellercodes.github.io', 'https://doctor-chaos.pages.dev'];
 const ITER = 20000; // PBKDF2 rounds (kept modest so it fits the free plan's CPU limit)
@@ -71,7 +74,7 @@ async function currentUser(req, env) {
   if (!s) return null;
   if (s.last_seen < now() - SESSION_DAYS * 864e5) { await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(th).run(); return null; }
   if (s.last_seen < now() - 36e5) await env.DB.prepare('UPDATE sessions SET last_seen = ? WHERE token_hash = ?').bind(now(), th).run();
-  const u = await env.DB.prepare('SELECT id, username, money, days, save, updated_at FROM users WHERE id = ?').bind(s.user_id).first();
+  const u = await env.DB.prepare('SELECT id, username, money, days, earned, save, updated_at FROM users WHERE id = ?').bind(s.user_id).first();
   return u ? { ...u, tokenHash: th } : null;
 }
 
@@ -129,7 +132,8 @@ export async function onRequest(context) {
     }
     // ---- leaderboards (public) ----
     if (route === 'leaderboard' && req.method === 'GET') {
-      const by = new URL(req.url).searchParams.get('by') === 'days' ? 'days' : 'money';
+      const q = new URL(req.url).searchParams.get('by');
+      const by = q === 'days' ? 'days' : q === 'money' ? 'money' : 'earned';
       const { results } = await env.DB.prepare(`SELECT username, ${by} AS value FROM users WHERE updated_at IS NOT NULL ORDER BY ${by} DESC, updated_at ASC LIMIT 50`).all();
       let me = null;
       const user = await currentUser(req, env);
@@ -146,7 +150,7 @@ export async function onRequest(context) {
     if (route === 'me' && req.method === 'GET') {
       let save = null;
       try { save = user.save ? JSON.parse(user.save) : null; } catch (e) { save = null; }
-      return json(req, { username: user.username, money: user.money, days: user.days, save });
+      return json(req, { username: user.username, money: user.money, days: user.days, earned: user.earned, save, guide: user.username === GUIDE_USER });
     }
     if (route === 'me' && req.method === 'DELETE') {
       await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id)]);
@@ -163,10 +167,16 @@ export async function onRequest(context) {
       // days played only goes up; money is sanity-capped so the board stays believable
       const days = Math.max(user.days, clampInt(b.days, 0, 100000));
       const money = clampInt(b.money, -1000000, 60000 + days * 15000);
+      // total earned only goes up, with a generous cap per day played
+      const earned = Math.max(user.earned || 0, clampInt(b.earned, 0, 100000 + days * 20000));
       const save = b.save ? JSON.stringify(b.save) : null;
       if (save && save.length > 150000) return fail(req, 'Save is too big.');
-      await env.DB.prepare('UPDATE users SET money = ?, days = ?, save = COALESCE(?, save), updated_at = ? WHERE id = ?').bind(money, days, save, now(), user.id).run();
-      return json(req, { ok: true, money, days });
+      await env.DB.prepare('UPDATE users SET money = ?, days = ?, earned = ?, save = COALESCE(?, save), updated_at = ? WHERE id = ?').bind(money, days, earned, save, now(), user.id).run();
+      return json(req, { ok: true, money, days, earned });
+    }
+    if (route === 'guide' && req.method === 'GET') {
+      if (user.username !== GUIDE_USER) return fail(req, 'Nice try. This is only for the creator.', 403);
+      return json(req, { guide: GUIDE });
     }
     return fail(req, 'Not found.', 404);
   } catch (e) {

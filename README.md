@@ -17,6 +17,12 @@ Every day, 5 patients come into your exam room. Read their chart, pick the right
 | Reflex Hammer | Bonk the knee with the right power. Too hard and it kicks you in the face |
 | Stethoscope | Find the loudest heartbeat, then tap along with it |
 | Cast | Pick a color, straighten the arm, wrap it in circles, sign it |
+| Thermometer | Pop it in the mouth, then shush the patient every time they try to talk |
+| Pressure Cuff | Pump it into the green, then click on the very first heartbeat as the air lets out |
+| Ear Scope | Look around inside the ear with a small circle of light and tap everything hiding in there |
+| Eye Drops | One drop in each eye, timed between blinks |
+| Bandage | Clean the scrape, squeeze on ointment, stick the bandage on straight |
+| X-ray | Put the frame over the hurt spot and snap the picture while the patient holds still |
 
 About every other day (on a random schedule, never a fixed rhythm) a special patient turns up with a mini-game of their own:
 
@@ -33,19 +39,19 @@ There are also funny regulars: a vampire who needs a blood test, a pirate with a
 
 Mess up badly and you get sued. How much depends on how bad it was. Money buys upgrades between days (steadier hands, a lawyer, running shoes, a lollipop jar, coat colors).
 
-Progress saves after every patient, so you can leave in the middle of a day and pick up with the next patient. There are 54 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, talking speed, graphics, screen shake, bigger text, full screen).
+It gets harder every day, the clinic has bills to pay at the end of each day, and stars are tough to earn. Progress saves after every patient, and the pause button has an option to go back to the main menu without losing anything. There are 54 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, talking speed, graphics, screen shake, bigger text, full screen).
 
 There are also secrets. A lot of them. Some are codes you type into Settings. We are not telling you where they are.
 
 ### Accounts and leaderboards
 
-Players can make an account with just a username and a password (no email, nothing personal). An account gets you on two leaderboards (most money, most days played) and saves your progress in the cloud so you can switch devices. Usernames go through a bad-word filter.
+Players can make an account with just a username and a password (no email, nothing personal). An account gets you on two leaderboards (most money earned in total, most days played) and saves your progress in the cloud so you can switch devices. Usernames go through a bad-word filter.
 
 ### Phones
 
 Turn the phone sideways. On Android the game offers a full screen button. iPhones don't let websites go full screen, so the game explains how to add it to the home screen, where it opens with no browser bars.
 
-Rated about 12+: cartoony, some dark-ish jokes, nothing graphic.
+Rated about 12+: some dark-ish jokes, nothing graphic. All the pictures in the menus are drawn for the game (no emoji).
 
 ## Tech
 
@@ -94,3 +100,4 @@ Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appen
 - GitHub Pages serves the `docs/` folder from `main`.
 - Cloudflare Pages: `npm install` then `npm run deploy`. This uploads the site plus the API function. The GitHub Pages copy talks to the API on `doctor-chaos.pages.dev`.
 - First-time database setup: `npx wrangler@4 d1 create doctor-chaos-db`, put the id in `wrangler.toml`, then `npm run db:init`.
+- Database changes for an existing database live in `migrations/` (run each once with `npx wrangler@4 d1 execute doctor-chaos-db --remote --file=migrations/<file>`).

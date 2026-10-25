@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at INTEGER NOT NULL,
   money INTEGER NOT NULL DEFAULT 0,
   days INTEGER NOT NULL DEFAULT 0,
+  earned INTEGER NOT NULL DEFAULT 0,
   save TEXT,
   updated_at INTEGER,
   fails INTEGER NOT NULL DEFAULT 0,
@@ -15,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS idx_users_money ON users(money DESC);
 CREATE INDEX IF NOT EXISTS idx_users_days ON users(days DESC);
+CREATE INDEX IF NOT EXISTS idx_users_earned ON users(earned DESC);
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,

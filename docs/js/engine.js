@@ -30,10 +30,14 @@ function gradient() {
   return gradTex;
 }
 const matCache = new Map();
+// Shiny grays read as metal (tools, poles, hinges). Everything else is a soft, slightly rough surface.
+const METAL = new Set(['#cfd8dc', '#90a4ae', '#b0bec5', '#c0c8cc', '#78909c', '#607d8b', '#9e9e9e', '#bdbdbd']);
 export function toon(color, opts = {}) {
   const key = color + JSON.stringify(opts);
   if (!opts.unique && matCache.has(key)) return matCache.get(key);
-  const m = new THREE.MeshToonMaterial({ color, gradientMap: gradient(), ...stripOpts(opts) });
+  const base = { color, roughness: 0.72, metalness: 0 };
+  if (typeof color === 'string' && METAL.has(color.toLowerCase())) { base.metalness = 0.55; base.roughness = 0.32; }
+  const m = new THREE.MeshStandardMaterial({ ...base, ...stripOpts(opts) });
   if (!opts.unique) matCache.set(key, m);
   return m;
 }
@@ -59,9 +63,27 @@ export function createEngine(canvas) {
   renderer.setPixelRatio(QS.has('lowq') ? 0.5 : Math.min(window.devicePixelRatio || 1, 2));
   renderer.shadowMap.enabled = !QS.has('lowq');
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = 1.0;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#9fd9d2');
+  // soft light bouncing around a bright room, so surfaces pick up gentle reflections
+  {
+    const env = new THREE.Scene();
+    const shell = new THREE.Mesh(new THREE.BoxGeometry(12, 6, 12), new THREE.MeshBasicMaterial({ color: '#c9ded8', side: THREE.BackSide }));
+    shell.position.y = 2; env.add(shell);
+    const panel = (w, h, x, y, z, ry, rx, k) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffffff').multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); env.add(m); };
+    panel(5, 3, 0, 4.9, 0, 0, Math.PI / 2, 3.5);
+    panel(3, 2, 5.9, 2.5, -1, -Math.PI / 2, 0, 2.2);
+    panel(4, 2.2, -1, 2.6, -5.9, 0, 0, 1.6);
+    panel(3, 2, -5.9, 2.2, 2, Math.PI / 2, 0, 1.2);
+    const floorBounce = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ color: '#d7ece6' })); floorBounce.rotation.x = -Math.PI / 2; floorBounce.position.y = -0.9; env.add(floorBounce);
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(env, 0.04).texture;
+    scene.environmentIntensity = 0.55;
+    pm.dispose();
+  }
   const camera = new THREE.PerspectiveCamera(50, 1, 0.03, 60);
   const basePos = new THREE.Vector3(0, 1.75, 3.7);
   const camTarget = new THREE.Vector3(0, 1.05, 0);
@@ -108,9 +130,12 @@ export function createEngine(canvas) {
   window.addEventListener('blur', () => { input.keys.clear(); });
 
   // ---------- resize ----------
+  let lastW = 0, lastH = 0;
   function resize() {
-    const w = canvas.clientWidth || window.innerWidth;
-    const h = canvas.clientHeight || window.innerHeight;
+    const w = canvas.clientWidth || document.documentElement.clientWidth || window.innerWidth;
+    const h = canvas.clientHeight || document.documentElement.clientHeight || window.innerHeight;
+    if (!w || !h) return;
+    lastW = w; lastH = h;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.fov = camera.aspect < 0.85 ? 64 : 50;
@@ -121,7 +146,15 @@ export function createEngine(canvas) {
       camTarget.copy(frameReq.center);
     }
   }
-  window.addEventListener('resize', resize);
+  // Phones (especially iPhone home-screen apps) report the new size late after rotating,
+  // so measure again a few times and whenever the canvas box actually changes.
+  const settle = () => { resize(); [60, 250, 600, 1200].forEach(ms => setTimeout(resize, ms)); };
+  window.addEventListener('resize', settle);
+  window.addEventListener('orientationchange', () => { window.scrollTo(0, 0); settle(); });
+  document.addEventListener('fullscreenchange', settle);
+  document.addEventListener('webkitfullscreenchange', settle);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', settle);
+  if (window.ResizeObserver) new ResizeObserver(() => { if (canvas.clientWidth !== lastW || canvas.clientHeight !== lastH) resize(); }).observe(canvas);
   resize();
 
   // ---------- tweens & updates ----------

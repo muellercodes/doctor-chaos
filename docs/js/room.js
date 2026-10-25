@@ -20,7 +20,7 @@ export function sph(r, color, x = 0, y = 0, z = 0, seg = 20) {
   return m;
 }
 function planeTex(w, h, tex, x, y, z, ry = 0) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshToonMaterial({ map: tex }));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex }));
   m.position.set(x, y, z); m.rotation.y = ry;
   m.receiveShadow = true;
   return m;
@@ -47,10 +47,10 @@ export function buildRoom(scene) {
   const R = { spots: {}, door: null };
 
   // ---------- lights ----------
-  const hemi = new THREE.HemisphereLight('#ffffff', '#7fb8ae', 1.7);
+  const hemi = new THREE.HemisphereLight('#ffffff', '#8fbfb5', 1.15);
   scene.add(hemi);
   R.hemi = hemi;
-  const sun = new THREE.DirectionalLight('#fff3df', 2.3);
+  const sun = new THREE.DirectionalLight('#fff1dc', 2.7);
   sun.position.set(2.5, 6.5, 4.0);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -73,7 +73,7 @@ export function buildRoom(scene) {
   }).tex;
   floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
   floorTex.repeat.set(5, 3.5);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 7), new THREE.MeshToonMaterial({ map: floorTex }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 7), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.38, metalness: 0 }));
   floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 0.6);
   floor.receiveShadow = true;
   scene.add(floor);
@@ -118,7 +118,7 @@ export function buildRoom(scene) {
   const faucet = cyl(0.02, 0.02, 0.25, '#cfd8dc', -0.55, 1.07, -0.22, 10); counter.add(faucet);
   counter.add(box(0.03, 0.03, 0.16, '#cfd8dc', -0.55, 1.19, -0.15));
   // jars
-  const glass = new THREE.MeshToonMaterial({ color: '#e0f7fa', transparent: true, opacity: 0.45, gradientMap: null });
+  const glass = new THREE.MeshStandardMaterial({ color: '#e0f7fa', transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.1 });
   const jar1 = cyl(0.1, 0.1, 0.24, glass, 0.15, 1.07, 0, 20); counter.add(jar1);
   for (let i = 0; i < 9; i++) counter.add(sph(0.035, '#ffffff', 0.15 + rand(-0.05, 0.05), 0.99 + rand(0, 0.12), rand(-0.05, 0.05), 8));
   counter.add(cyl(0.105, 0.105, 0.03, '#ff8a2a', 0.15, 1.2, 0, 20));
@@ -273,7 +273,7 @@ export function buildRoom(scene) {
     for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i) * 22) * 0.04);
     geo.computeVertexNormals();
     const ctex = canvasTexture(256, 256, (ctx, W, H) => { ctx.fillStyle = '#a0c4ff'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#bde0fe'; for (let x = 0; x < W; x += 32) ctx.fillRect(x, 0, 14, H); }).tex;
-    const cm = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ map: ctex, side: THREE.DoubleSide }));
+    const cm = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: ctex, side: THREE.DoubleSide }));
     cm.position.set(0, 1.32, 0); cm.castShadow = true;
     g.add(cm);
     const feet = new THREE.Group();

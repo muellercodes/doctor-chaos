@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { rattle as makeRattle, syringe } from '../props.js';
 import { clamp, rand, pick, shuffle } from '../engine.js';
 import { h } from '../ui.js';
+import { icon } from '../icons.js';
 
-const FACES = [{ id: 'tongue', emoji: '😛', label: 'Tongue' }, { id: 'puffy', emoji: '🐡', label: 'Puffy Cheeks' }, { id: 'googly', emoji: '🤪', label: 'Googly Eyes' }];
-const ACTIONS = { rattle: '🔔 Rattle', peekaboo: '🙈 Peekaboo', face: '😜 Silly Face' };
+const FACES = [{ id: 'tongue', label: 'Tongue' }, { id: 'puffy', label: 'Puffy Cheeks' }, { id: 'googly', label: 'Googly Eyes' }];
+const ACTIONS = { rattle: icon('rattle', 'in') + ' Rattle', peekaboo: icon('peek', 'in') + ' Peekaboo', face: icon('silly', 'in') + ' Silly Face' };
 
 export async function play(G, P) {
   const { E, ui, sfx } = G;
@@ -16,7 +17,7 @@ export async function play(G, P) {
     'The baby is crying. Fill the <b>Calm</b> meter to 100% before giving the shot.',
     'Try <b>Rattle</b>, <b>Peekaboo</b> and <b>Silly Face</b>. Every baby LOVES one, likes one, and HATES one. Watch how they react!',
     'When the baby is calm, <b>quick! Click in the green</b> to give the shot before they notice.',
-  ], '👶');
+  ], icon('baby'));
   const S = E.scope();
   const head = baby.headCenter();
   await E.frame(new THREE.Vector3(head.x + 0.42, head.y + 0.08, head.z), 1.55, 0.95, new THREE.Vector3(0, 0.22, 1), 0.8);
@@ -26,7 +27,7 @@ export async function play(G, P) {
   const favFace = pick(FACES).id;
   const boost = 1 + 0.15 * G.upg('lolli');
   G.dbg = { kind: 'baby', phase: 'choose', mult, favFace, calm: () => calm, look: () => baby.lookYaw, head };
-  const calmM = ui.meter({ label: 'Calm', value: calm / 100, fill: '#5dd6ff', ends: ['😭', '😊'], cls: 'wide' });
+  const calmM = ui.meter({ label: 'Calm', value: calm / 100, fill: '#5dd6ff', ends: [icon('cryFace', 'in'), icon('happyFace', 'in')], cls: 'wide' });
   let crySound = 0;
   S.update(dt => {
     t += dt;
@@ -40,7 +41,7 @@ export async function play(G, P) {
     calm = clamp(calm + gain * boost, 0, 100);
     if (gain > 0) {
       baby._lock = true; baby.expr('laugh'); sfx.giggle(0, 1.6);
-      ui.popAt(baby.headTop(), gain > 20 ? 'Giggle! 💕' : 'hehe', 'good');
+      ui.popAt(baby.headTop(), gain > 20 ? 'Giggle!' : 'hehe', 'good');
       setTimeout(() => { baby._lock = false; }, 900);
     } else {
       baby._lock = true; baby.expr('cry'); baby.wiggle = 0.8; sfx.wah(1.7); sfx.wah(1.5);
@@ -89,7 +90,7 @@ export async function play(G, P) {
       await react(mult.rattle > 0 ? count * 0.6 : -10, 'rattle');
       if (mult.rattle < 0) hates++;
     } else if (act === 'peekaboo') {
-      const hands = S.dom(h('div', 'peek-hands', '<div class="hand l">✋</div><div class="hand r">🤚</div>'));
+      const hands = S.dom(h('div', 'peek-hands', `<div class="hand l">${icon('hand')}</div><div class="hand r">${icon('hand')}</div>`));
       ui.root.appendChild(hands);
       ui.hint('Wait until the baby <b>looks at you</b>, then click: <b>PEEKABOO!</b>');
       let gain = 0;
@@ -121,9 +122,9 @@ export async function play(G, P) {
       ui.hint(null);
       if (mult.peekaboo < 0) hates++;
     } else {
-      const f = await ui.actions(FACES.map(x => ({ label: `${x.emoji} ${x.label}`, value: x.id })), { title: 'Make a face!' });
+      const f = await ui.actions(FACES.map(x => ({ label: `${icon(x.id, 'in')} ${x.label}`, value: x.id })), { title: 'Make a face!' });
       const face = FACES.find(x => x.id === f);
-      ui.popCenter(face.emoji, 'huge');
+      ui.popCenter(icon(face.id), 'huge');
       await E.wait(0.5);
       if (mult.face < 0) { hates++; await react(-10, 'face'); }
       else await react((f === favFace ? 30 : 13) * mult.face, 'face');
@@ -166,7 +167,7 @@ export async function play(G, P) {
         ui.popAt(baby.headTop(), '...?', '');
         await E.wait(0.8);
         baby.expr('laugh'); sfx.giggle(0, 1.7);
-        ui.popAt(baby.headTop(), 'Didn\'t even notice! 💕', 'good');
+        ui.popAt(baby.headTop(), 'Didn\'t even notice!', 'good');
         sfx.great();
         await E.wait(0.6);
         break;

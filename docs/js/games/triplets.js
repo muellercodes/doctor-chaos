@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { TABLE_TOP, clamp, pick, rand, toon } from '../engine.js';
 import { route, SPOTS } from '../nav.js';
+import { icon } from '../icons.js';
 
 const WRONG = ["I'M NOT SICK! I just came for the lollipops!", 'Nope! Healthy as a horse! A small horse!', 'Wrong one! Ha! I feel GREAT!'];
 const RIGHT = ['Aww! How did you KNOW?!', 'No fair, you were watching too close!', "Okay, it's me. *cough* It's definitely me."];
@@ -21,7 +22,7 @@ export async function play(G, P) {
     'Triplets! They look exactly the same, and only <b>one</b> of them is sick.',
     "Watch the one with the thermometer. Then they'll <b>switch places</b> really fast.",
     '<b>Click the sick triplet</b> when they stop. Pick wrong twice and their mom will be... upset.',
-  ], '👯');
+  ], icon('twins'));
   const actors = [P.extras[0], P.person, P.extras[1]];
   const names = c.triplets || ['A', 'B', 'C'];
   actors.forEach((a, i) => { a.tripName = names[i]; });
@@ -38,7 +39,7 @@ export async function play(G, P) {
   sick.expr('sad'); sick.shiver = 3;
   actors.filter(a => a !== sick).forEach(a => a.expr('happy'));
   ui.hint('Watch the <b>sick</b> triplet (the one with the thermometer)!');
-  ui.popAt(sick.headTop(), '🤒 This one!', 'bad');
+  ui.popAt(sick.headTop(), 'This one!', 'bad');
   sfx.blip(0.8);
   await say(sick, '*cough* ...I feel fine. *cough*', { hold: 0.8 });
   await E.wait(0.6);

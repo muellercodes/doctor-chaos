@@ -158,7 +158,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd9d2; fon
 .howto b { color: var(--orange-d); }
 
 .stars { display: flex; justify-content: center; gap: 6px; margin: 8px 0; }
-.star { font-size: 54px; color: #d5dde3; -webkit-text-stroke: 3px var(--ink); line-height: 1; }
+.star { display: inline-block; line-height: 0; }
+.star svg { width: 58px; height: 58px; }
 .star.on { color: var(--yellow); animation: starIn 0.4s cubic-bezier(.2,1.6,.4,1) backwards; }
 @keyframes starIn { from { transform: scale(0) rotate(-90deg); } }
 .result-name { font-size: 24px; font-weight: 700; }
@@ -225,7 +226,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #9fd9d2; fon
 
 /* ---------- cast wrap guide ---------- */
 .wrap-guide { left: 0; top: 0; width: 150px; height: 150px; margin: -75px 0 0 -75px; border: 4px dashed rgba(255,210,63,0.9); border-radius: 50%; animation: spin 2.4s linear infinite; }
-.wrap-guide::after { content: '↻'; position: absolute; right: -14px; top: -16px; font-size: 32px; color: var(--yellow); text-shadow: 0 2px 0 var(--ink); }
+.wrap-arrow { position: absolute; right: -16px; top: -18px; width: 38px; height: 38px; background: var(--yellow); border-radius: 50%; padding: 4px; }
+.wrap-arrow svg { width: 100%; height: 100%; display: block; }
 @keyframes spin { to { rotate: 360deg; } }
 
 /* ---------- baby peekaboo hands ---------- */
@@ -438,3 +440,65 @@ body.big-text .chart-row.complaint { font-size: 17px; }
   .credits { font-size: 12px; padding: 3px 10px; }
   .title-buttons { flex-direction: row; justify-content: center; }
 }
+
+/* ---------- drawn icons ---------- */
+svg.ic { display: inline-block; vertical-align: middle; overflow: visible; }
+svg.ic.in { width: 1.2em; height: 1.2em; vertical-align: -0.25em; }
+.card-icon svg { width: 60px; height: 60px; }
+.shop-icon svg { width: 38px; height: 38px; }
+.ach-icon svg { width: 32px; height: 32px; }
+.toast-icon svg { width: 38px; height: 38px; }
+.menu-btn span svg { width: 28px; height: 28px; }
+.icon-btn svg { width: 22px; height: 22px; }
+.note svg { width: 38px; height: 38px; }
+.vitals .heart svg { width: 24px; height: 24px; vertical-align: -3px; }
+.peek-hands .hand svg { width: min(48vh, 400px); height: min(48vh, 400px); }
+.peek-hands .hand.r svg { transform: scaleX(-1); }
+.tbtn svg { width: 42px; height: 42px; }
+.taco svg { width: 100%; height: 100%; }
+.roach { width: 52px; height: 52px; }
+.roach svg { width: 100%; height: 100%; }
+.pop.huge svg { width: 150px; height: 150px; }
+.meter-ends svg { width: 24px; height: 24px; }
+.lb .rk svg.rank { width: 30px; height: 30px; }
+.summary .st svg { width: 17px; height: 17px; }
+.summary .st .ic:nth-child(n) { margin-right: 1px; }
+.btn svg.ic.in { margin-right: 2px; }
+@media (max-width: 700px), (max-height: 500px) { .icon-btn svg { width: 17px; height: 17px; } .tbtn svg { width: 36px; height: 36px; } }
+
+/* creator's secret guide */
+.guide { text-align: left; }
+.guide h3 { margin: 14px 0 6px; font-size: 17px; color: var(--teal-d); }
+.g-item { background: #fff; border: 2px solid var(--ink); border-radius: 12px; padding: 6px 12px; margin: 6px 0; }
+.g-item summary { font-weight: 700; cursor: pointer; }
+.g-item p { margin: 6px 0 2px; font-size: 15px; line-height: 1.35; }
+.menu-btn.creator { background: #fff3c4; }
+.acct-stats { gap: 6px; }
+.acct-stats b { font-size: 20px; }
+
+/* keep edge UI clear of the iPhone notch and rounded corners (home-screen app, full screen) */
+.hud { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.chart, .vitals { left: max(14px, env(safe-area-inset-left)); }
+.nurse { left: max(12px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); max-width: min(600px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))); }
+.meters, .timer { right: max(14px, env(safe-area-inset-right)); }
+.tray { bottom: max(12px, env(safe-area-inset-bottom)); }
+.actions { bottom: max(16px, env(safe-area-inset-bottom)); }
+.tbtn.left { left: max(20px, env(safe-area-inset-left)); }
+.tbtn.right { left: calc(max(20px, env(safe-area-inset-left)) + 100px); }
+.tbtn.jump { right: max(24px, env(safe-area-inset-right)); }
+#title, .overlay { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+@media (max-width: 700px) { .meters { right: max(8px, env(safe-area-inset-right)); } }
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud { padding: max(4px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 4px max(8px, env(safe-area-inset-left)); }
+}
+.summary-card .totals { flex-wrap: wrap; gap: 4px 10px; }
+.bills { font-size: 13px; margin-top: 2px; }
+
+/* new tools */
+.scope-view { inset: 0; z-index: -1; }
+.scope-view canvas { position: absolute; left: 0; top: 0; }
+.bp-heart { width: 54px; height: 54px; align-self: flex-end; opacity: 0.35; transition: opacity 0.3s; }
+.bp-heart svg { width: 100%; height: 100%; }
+.bp-heart.on { animation: bpBeat 0.5s ease-out; }
+@keyframes bpBeat { 0% { opacity: 1; transform: scale(1.35); } 100% { opacity: 0.35; transform: scale(1); } }
+.tray-row { max-width: min(760px, calc(100vw - 30px)); margin: 0 auto; }

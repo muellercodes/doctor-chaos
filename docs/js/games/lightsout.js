@@ -1,6 +1,7 @@
 // Lights Out: the prankster patient killed the power. Find them in the dark hospital wing with a flashlight.
 import { clamp, rand, pick, shuffle } from '../engine.js';
 import { openArcade, roundRect, banner, bubble, pops as makePops } from './arcade.js';
+import { icon, drawIcon } from '../icons.js';
 
 const T = 56; // tile size
 const SPOOKY = ['Wooooooo...', 'Hehehe...', 'Over heeere...', 'Are you scaaared?', 'BOO! ...no wait, not yet.', 'I can see youuu...'];
@@ -34,7 +35,7 @@ export async function play(G, P) {
     `${c.first} pulled a prank and <b>turned off the power</b>! They're hiding somewhere in the dark wing, dressed as a ghost.`,
     'Move with <b>arrow keys / WASD</b>, or <b>hold the mouse</b> where you want to walk. Your flashlight points where you go.',
     "<b>Listen</b> for giggles and watch for glowing eyes. The radar beeps faster when you're close.",
-  ], '🔦');
+  ], icon('flashlight'));
   const A = openArcade(G, { VH: 540, song: 'surgery' });
   const { ctx, sfx } = A;
   const diff = G.diff;
@@ -156,7 +157,7 @@ export async function play(G, P) {
     const left = Math.max(0, Math.ceil(limit - t));
     ctx.fillStyle = 'rgba(29,43,54,0.85)'; roundRect(ctx, VW / 2 - 130, VH - 54, 260, 40, 20); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = '700 18px Fredoka, Arial'; ctx.textAlign = 'center';
-    ctx.fillText(`🔦 Find ${c.first}!   ⏱ ${left}`, VW / 2, VH - 28);
+    ctx.fillText(`Find ${c.first}!     ${left}`, VW / 2 + 10, VH - 28); drawIcon(ctx, 'flashlight', VW / 2 - 102, VH - 34, 24); drawIcon(ctx, 'timer', VW / 2 + 52, VH - 34, 22);
     if (state === 'intro') banner(ctx, VW, VH, stT < 0.9 ? '*click* ...LIGHTS OUT!' : 'FIND THE GHOST!', '#ffd23f', VH / 2 - 40, 52);
     if (state === 'found') { banner(ctx, VW, VH, 'BOO!!!', '#ffffff', VH / 2 - 60, 96); banner(ctx, VW, VH, 'Found you!', '#2ec4b6', VH / 2 + 30, 40); }
     if (state === 'timeout') banner(ctx, VW, VH, 'The lights flicker back on...', '#ffd23f', VH / 2 - 40, 40);

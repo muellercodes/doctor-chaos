@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { object as makeObject, tweezers, OBJECT_NAMES } from '../props.js';
 import { TABLE_TOP, clamp, rand, canvasTexture } from '../engine.js';
+import { icon } from '../icons.js';
 
 const CW = 1024, CH = 640;
 
@@ -55,7 +56,7 @@ export async function play(G, P, prm = {}) {
     'Drag it along the glowing tunnel to the <b>EXIT</b>.',
     "Don't touch the walls! <b>BZZT!</b> Every zap hurts the patient.",
     'Too many zaps, or running out of time, and you might get <b>sued</b>.',
-  ], '🔍');
+  ], icon('magnifier'));
 
   const S = E.scope();
   await person.lieDown(E);
@@ -66,7 +67,7 @@ export async function play(G, P, prm = {}) {
   await E.frame(center, W * 1.06, H * 1.22, dir, 0.9);
 
   // ---- board ----
-  const diff = G.tutorial ? 0 : G.diff;
+  const diff = G.tutorial ? 0 : Math.min(1.3, G.diff);
   const hw = (G.tutorial ? 56 : 48 - diff * 13) * G.tol;
   const objR = hw * 0.5;
   const allowed = hw - objR * 0.9;
@@ -103,7 +104,7 @@ export async function play(G, P, prm = {}) {
     ctx.fillStyle = '#5dffb0'; ctx.font = '700 46px Fredoka, Arial, sans-serif'; ctx.textAlign = flip ? 'left' : 'right';
     ctx.shadowColor = '#5dffb0'; ctx.shadowBlur = 16;
     const ly = e.y < 110 ? e.y + hw + 52 : e.y - hw - 16;
-    ctx.fillText(flip ? '◀ EXIT' : 'EXIT ▶', flip ? 18 : CW - 18, ly);
+    ctx.fillText('EXIT', flip ? 40 : CW - 40, ly); { const ax = flip ? 22 : CW - 22, d = flip ? -1 : 1; ctx.beginPath(); ctx.moveTo(ax - d * 8, ly - 22); ctx.lineTo(ax + d * 8, ly - 12); ctx.lineTo(ax - d * 8, ly - 2); ctx.closePath(); ctx.fill(); }
     ctx.restore();
     ctx.fillStyle = 'rgba(200,240,255,0.75)'; ctx.font = '600 30px Fredoka, Arial, sans-serif'; ctx.textAlign = flip ? 'right' : 'left';
     ctx.fillText(`X-RAY SCANNER · ${where.toUpperCase()}`, flip ? CW - 24 : 24, 44);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { needleTube, vial, bandage } from '../props.js';
 import { clamp, rand } from '../engine.js';
 import { armSetup } from './shot.js';
+import { icon } from '../icons.js';
 
 const VEIN_VS = `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
 const VEIN_FS = `uniform vec3 uLight; uniform float uR; uniform vec3 uColor; varying vec3 vW;
@@ -17,7 +18,7 @@ export async function play(G, P, prm = {}) {
     '<b>Tap the arm</b> to tie the stretchy band.',
     'Veins are hiding! Move the purple <b>Vein Finder</b> light around to find the <b>big</b> blue vein, then <b>click on it</b>.',
     '<b>Hold</b> to fill the tube. It speeds up! <b>Let go</b> when it reaches the lines.',
-  ], '🩸');
+  ], icon('blood'));
   const S = E.scope();
   const side = 'R';
   const a = await armSetup(G, P, side, 'lower');
@@ -30,7 +31,7 @@ export async function play(G, P, prm = {}) {
 
   // ---- phase 1: tourniquet ----
   ui.hint('<b>Tap the upper arm</b> to tie the band.');
-  const tq = new THREE.Mesh(new THREE.TorusGeometry(0.06 * s, 0.012 * s, 8, 24), new THREE.MeshToonMaterial({ color: '#3a86ff' }));
+  const tq = new THREE.Mesh(new THREE.TorusGeometry(0.06 * s, 0.012 * s, 8, 24), new THREE.MeshStandardMaterial({ color: '#3a86ff' }));
   tq.material.userData.dispose = true;
   const tqPos = a.elbow.clone().lerp(a.shoulder, 0.35);
   tq.position.copy(tqPos); tq.rotation.y = Math.PI / 2; tq.scale.setScalar(1.6); tq.visible = false; S.add(tq);

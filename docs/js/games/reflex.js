@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { hammer } from '../props.js';
+import { hammer, holdWith } from '../props.js';
 import { clamp, pick } from '../engine.js';
+import { icon } from '../icons.js';
 
 const MISS = ["That's my shin, doc.", 'Ow! That is NOT my knee.', 'Wrong spot! Are you bonking randomly?', "Hey! That's my OTHER leg."];
 const WEAK = ['...Was that it? Nothing happened.', 'Did you hit it? I felt a breeze.', "I've been hit harder by a feather."];
@@ -14,7 +15,7 @@ export async function play(G, P) {
     'Move the hammer to the <b>yellow circle</b> just below the kneecap.',
     '<b>Hold</b> to wind up. The power bar goes up and down.',
     '<b>Let go in the green</b>. Too soft does nothing. Too hard... well. You will see.',
-  ], '🔨');
+  ], icon('reflex'));
   const S = E.scope();
   person.setPose('sit');
   await E.wait(0.3);
@@ -23,12 +24,13 @@ export async function play(G, P) {
   const kL = person.wp(person.j.knL), kR = person.wp(person.j.knR);
   const center = kL.clone().lerp(kR, 0.5); center.y -= 0.08 * s; center.z += 0.05 * s;
   await E.frame(center, 0.65 * s, 0.45 * s, new THREE.Vector3(0, 0.35, 1), 0.8);
-  const diff = G.tutorial ? 0 : G.diff;
+  const diff = G.tutorial ? 0 : Math.min(1.25, G.diff);
   const ringR = 0.032 * s * G.tol;
   // The hammer hangs from a pivot at the doctor's hand. When it strikes, the head lands exactly on the aim dot.
   const HS = s * 0.95, L = 0.26 * HS, STRIKE = -0.6;
   const pivot = new THREE.Group(); S.add(pivot);
   const ham = hammer(); ham.scale.setScalar(HS); ham.position.y = -L; pivot.add(ham);
+  holdWith(pivot, G.coatColor || '#ffffff', [0, -0.015 * HS, 0], [0, 0, 0], HS);
   ham.traverse(o => { if (o.isMesh) o.renderOrder = 6; });
   const aimDot = new THREE.Mesh(new THREE.RingGeometry(0.006 * s, 0.01 * s, 20), new THREE.MeshBasicMaterial({ color: '#1d2b36', depthTest: false })); aimDot.material.userData.dispose = true; aimDot.renderOrder = 5; S.add(aimDot);
   const handOff = new THREE.Vector3(-Math.sin(STRIKE) * L, Math.cos(STRIKE) * L, 0); // hand relative to head at strike angle
@@ -120,7 +122,7 @@ export async function play(G, P) {
           if (G.ach) G.ach('kicked');
           mega++; penalty += 22;
           E.shake(0.06); ui.flash('rgba(255,255,255,0.8)'); sfx.thud();
-          ui.popCenter('OOF! 💫', 'bad');
+          ui.popCenter('OOF!', 'bad');
           const bp = E.basePos.clone();
           await E.tween(0.15, k => { E.basePos.y = bp.y + 0.06 * s * k; E.basePos.z = bp.z + 0.12 * s * k; });
           person.expr('surprised');

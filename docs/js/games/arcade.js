@@ -25,6 +25,10 @@ export function openArcade(G, { VH = 540, song = 'chase', buttons = [] } = {}) {
   const key = (...codes) => codes.some(c => E.input.keys.has(c));
   // pointer position in virtual (game) coordinates
   const pointer = () => ({ x: E.input.cx * view.dpr / view.scale, y: E.input.cy * view.dpr / view.scale, down: E.input.down, has: E.input.has });
+  // how much of the screen edge the notch covers, in game units
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:env(safe-area-inset-left);top:0;width:0;height:0;visibility:hidden;pointer-events:none';
+  document.body.appendChild(probe);
   function run(frame) {
     return new Promise(res => {
       let last = performance.now();
@@ -34,10 +38,11 @@ export function openArcade(G, { VH = 540, song = 'chase', buttons = [] } = {}) {
         const dt = Math.min(0.033, (now - last) / 1000); last = now;
         if (G.E.paused) return;
         view.dpr = Math.min(2, window.devicePixelRatio || 1);
-        const cw = Math.round(window.innerWidth * view.dpr), ch = Math.round(window.innerHeight * view.dpr);
+        const cw = Math.round((canvas.clientWidth || window.innerWidth) * view.dpr), ch = Math.round((canvas.clientHeight || window.innerHeight) * view.dpr);
         if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
         view.scale = canvas.height / VH;
         view.VW = canvas.width / view.scale;
+        view.safeL = (probe.getBoundingClientRect().left || 0) * view.dpr / view.scale;
         ctx.setTransform(view.scale, 0, 0, view.scale, 0, 0);
         let r;
         try { r = frame(dt, view); } catch (e) { console.error(e); r = { score: 50 }; }
@@ -47,6 +52,7 @@ export function openArcade(G, { VH = 540, song = 'chase', buttons = [] } = {}) {
     });
   }
   function close() {
+    probe.remove();
     canvas.classList.add('hidden');
     ui.touch.classList.add('hidden'); ui.touch.innerHTML = '';
     E.paused3D = false;

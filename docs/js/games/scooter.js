@@ -1,6 +1,7 @@
 // Top-down scooter escape: the patient zooms off on a mobility scooter, you chase in a wheelchair.
 import { clamp, rand, pick } from '../engine.js';
 import { openArcade, roundRect, banner, bubble, pops as makePops } from './arcade.js';
+import { icon } from '../icons.js';
 
 const HW = 420; // hallway width
 const TAUNTS = ['Beep beep, slowpoke!', 'Eight miles an hour of FREEDOM!', 'You will never take me alive! ...Or with a needle!', 'My scooter has turbo! It does not. But still!', 'Out of my way, I have a bingo game!', 'Wheee! I have not felt this young in years!'];
@@ -11,11 +12,11 @@ export async function play(G, P) {
   await G.howTo('scooter', 'SCOOTER ESCAPE!', [
     `${c.first} stole a mobility scooter and is zooming away! Hop in a wheelchair and <b>catch them</b> before the EXIT.`,
     'Steer with <b>← →</b> or <b>A D</b> (or move the mouse left and right).',
-    'Dodge signs, carts, beds and nurses. <b>Puddles make you slide.</b> Grab <b>☕ coffee</b> for a boost.',
-  ], '🛵');
-  const A = openArcade(G, { VH: 540, song: 'chase', buttons: [{ cls: 'left', label: '◀', key: 'left' }, { cls: 'right', label: '▶', key: 'right' }] });
+    'Dodge signs, carts, beds and nurses. <b>Puddles make you slide.</b> Grab <b>' + icon('coffee', 'in') + ' coffee</b> for a boost.',
+  ], icon('wheelchair'));
+  const A = openArcade(G, { VH: 540, song: 'chase', buttons: [{ cls: 'left', label: icon('left'), key: 'left' }, { cls: 'right', label: icon('right'), key: 'right' }] });
   const { ctx, sfx } = A;
-  const diff = G.diff;
+  const diff = Math.min(1, G.diff); // the scooter can never be faster than you
   const L = Math.round(6000 + diff * 1000);
   const obs = [], pickups = [];
   for (let d = 700; d < L - 300; d += rand(270, 440) - diff * 40) {
@@ -71,7 +72,7 @@ export async function play(G, P) {
         }
       }
       for (const pu of pickups) {
-        if (pu.alive && Math.abs(pu.x - pl.x) < 34 && Math.abs(pu.d - pl.d) < 40) { pu.alive = false; pl.boost = 2.6; sfx.coin(); pp.add('☕ BOOST!', hx0 + pl.x, VH * 0.86 - 60, '#ff8a2a'); }
+        if (pu.alive && Math.abs(pu.x - pl.x) < 34 && Math.abs(pu.d - pl.d) < 40) { pu.alive = false; pl.boost = 2.6; sfx.coin(); pp.add('BOOST!', hx0 + pl.x, VH * 0.86 - 60, '#ff8a2a'); }
       }
       // patient AI
       pa.nextPause -= dt; pa.tauntT -= dt; pa.sayT -= dt;

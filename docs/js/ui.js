@@ -1,4 +1,5 @@
 import { sfx } from './audio.js';
+import { icon } from './icons.js';
 
 export function h(tag, cls = '', html = '') {
   const el = document.createElement(tag);
@@ -15,6 +16,12 @@ export const ICONS = {
   reflex: '<svg viewBox="0 0 48 48"><rect x="22" y="16" width="4" height="30" rx="2" fill="#cfd8dc" stroke="#1d2b36" stroke-width="2.5"/><path d="M8 8 L40 8 L24 20 Z" fill="#e63946" stroke="#1d2b36" stroke-width="2.5" stroke-linejoin="round"/></svg>',
   steth: '<svg viewBox="0 0 48 48"><path d="M12 4 v12 a10 10 0 0 0 20 0 v-12" fill="none" stroke="#26a69a" stroke-width="4"/><path d="M22 26 v6 q0 10 10 10" fill="none" stroke="#26a69a" stroke-width="4"/><circle cx="36" cy="38" r="7" fill="#cfd8dc" stroke="#1d2b36" stroke-width="2.5"/><circle cx="12" cy="4" r="3" fill="#1d2b36"/><circle cx="32" cy="4" r="3" fill="#1d2b36"/></svg>',
   cast: '<svg viewBox="0 0 48 48"><ellipse cx="18" cy="24" rx="12" ry="14" fill="#fffaf0" stroke="#1d2b36" stroke-width="2.5"/><ellipse cx="18" cy="24" rx="5" ry="6" fill="#ffd6a5" stroke="#1d2b36" stroke-width="2"/><path d="M18 38 L44 38 L44 30" fill="#fffaf0" stroke="#1d2b36" stroke-width="2.5" stroke-linejoin="round"/></svg>',
+  thermo: '<svg viewBox="0 0 48 48"><g transform="rotate(35 24 24)"><rect x="20" y="4" width="8" height="30" rx="4" fill="#ffffff" stroke="#1d2b36" stroke-width="2.5"/><circle cx="24" cy="38" r="6" fill="#e63946" stroke="#1d2b36" stroke-width="2.5"/><rect x="22.5" y="16" width="3" height="18" fill="#e63946"/><path d="M28 10h3M28 15h3M28 20h3M28 25h3" stroke="#1d2b36" stroke-width="2"/></g></svg>',
+  bp: '<svg viewBox="0 0 48 48"><rect x="4" y="8" width="20" height="16" rx="5" fill="#3a86ff" stroke="#1d2b36" stroke-width="2.5"/><circle cx="34" cy="16" r="10" fill="#ffffff" stroke="#1d2b36" stroke-width="2.5"/><path d="M34 16l5-4" stroke="#e63946" stroke-width="2.5" stroke-linecap="round"/><path d="M14 24q0 12 10 14q8 2 10 6" fill="none" stroke="#1d2b36" stroke-width="2.5"/><ellipse cx="34" cy="42" rx="7" ry="4.5" fill="#1d2b36"/></svg>',
+  otoscope: '<svg viewBox="0 0 48 48"><path d="M30 6l12 12-8 4-8-8z" fill="#cfd8dc" stroke="#1d2b36" stroke-width="2.5"/><path d="M26 14l8 8-4 3-7-7z" fill="#90a4ae" stroke="#1d2b36" stroke-width="2.5"/><rect x="10" y="22" width="8" height="22" rx="3" fill="#2bb3a3" stroke="#1d2b36" stroke-width="2.5" transform="rotate(-45 14 33)"/><circle cx="39" cy="9" r="2.5" fill="#ffd23f"/></svg>',
+  drops: '<svg viewBox="0 0 48 48"><rect x="18" y="4" width="12" height="10" rx="5" fill="#ff5d8f" stroke="#1d2b36" stroke-width="2.5"/><path d="M19 14h10l-2 20h-6z" fill="#bde0fe" stroke="#1d2b36" stroke-width="2.5"/><path d="M24 34v4" stroke="#1d2b36" stroke-width="2.5"/><path d="M24 40q-4 4 0 6q4-2 0-6z" fill="#7fdbff" stroke="#1d2b36" stroke-width="2.5"/></svg>',
+  bandage: '<svg viewBox="0 0 48 48"><g transform="rotate(-35 24 24)"><rect x="4" y="16" width="40" height="16" rx="8" fill="#ffcc80" stroke="#1d2b36" stroke-width="2.5"/><rect x="17" y="16" width="14" height="16" fill="#ffe0b2" stroke="#1d2b36" stroke-width="2.5"/><circle cx="21" cy="21" r="1.2" fill="#1d2b36"/><circle cx="27" cy="21" r="1.2" fill="#1d2b36"/><circle cx="21" cy="27" r="1.2" fill="#1d2b36"/><circle cx="27" cy="27" r="1.2" fill="#1d2b36"/></g></svg>',
+  xray: '<svg viewBox="0 0 48 48"><rect x="6" y="6" width="36" height="36" rx="4" fill="#1d3557" stroke="#1d2b36" stroke-width="2.5"/><path d="M18 14q6 2 12 0M24 15v20M17 20q7 3 14 0M17 25q7 3 14 0M18 30q6 2 12 0" fill="none" stroke="#bde0fe" stroke-width="2.5" stroke-linecap="round"/><circle cx="24" cy="11" r="3" fill="#bde0fe"/></svg>',
 };
 
 export const TOOLS = [
@@ -25,6 +32,12 @@ export const TOOLS = [
   { id: 'reflex', label: 'Reflex Hammer' },
   { id: 'steth', label: 'Stethoscope' },
   { id: 'cast', label: 'Cast' },
+  { id: 'thermo', label: 'Thermometer' },
+  { id: 'bp', label: 'Pressure Cuff' },
+  { id: 'otoscope', label: 'Ear Scope' },
+  { id: 'drops', label: 'Eye Drops' },
+  { id: 'bandage', label: 'Bandage' },
+  { id: 'xray', label: 'X-ray' },
 ];
 
 const NURSE_SVG = '<svg viewBox="0 0 64 64"><circle cx="32" cy="36" r="20" fill="#c68642"/><path d="M12 34 q0 -22 20 -22 q20 0 20 22 q-4 -12 -20 -12 q-16 0 -20 12z" fill="#2b1d14"/><path d="M16 18 q16 -12 32 0 l-2 6 q-14 -8 -28 0z" fill="#fff" stroke="#1d2b36" stroke-width="2"/><rect x="29" y="12" width="6" height="10" fill="#ff4d5e"/><rect x="27" y="14" width="10" height="6" fill="#ff4d5e"/><circle cx="25" cy="37" r="2.6" fill="#1d2b36"/><circle cx="39" cy="37" r="2.6" fill="#1d2b36"/><path d="M26 45 q6 5 12 0" stroke="#1d2b36" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M21 32 l7 -1.5 M43 32 l-7 -1.5" stroke="#1d2b36" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -36,17 +49,18 @@ export function createUI(root, E) {
   // ---------- HUD ----------
   const hud = layer('hud hidden');
   const hudDay = h('div', 'pill', 'Day 1'); const hudPat = h('div', 'pill', ''); const hudMoney = h('div', 'pill money', '$0');
-  const muteBtn = h('button', 'icon-btn interactive', '🔊');
+  const muteBtn = h('button', 'icon-btn interactive', icon('soundOn'));
   muteBtn.title = 'Sound on/off';
-  muteBtn.onclick = () => { muteBtn.blur(); sfx.setMuted(!sfx.muted); muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; ui.onMute && ui.onMute(sfx.muted); };
-  const fsBtn = h('button', 'icon-btn interactive', '⛶');
+  muteBtn.onclick = () => { muteBtn.blur(); sfx.setMuted(!sfx.muted); muteBtn.innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); ui.onMute && ui.onMute(sfx.muted); };
+  const fsBtn = h('button', 'icon-btn interactive', icon('fullscreen'));
   fsBtn.title = 'Full screen';
   fsBtn.onclick = () => { fsBtn.blur(); if (ui.onFullscreen) { ui.onFullscreen(); return; } try { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); } catch (e) { /* ignore */ } };
-  const gearBtn = h('button', 'icon-btn interactive', '⚙️');
-  gearBtn.title = 'Settings';
+  if (window.matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone) fsBtn.style.display = 'none';
+  const gearBtn = h('button', 'icon-btn interactive', icon('pause'));
+  gearBtn.title = 'Pause';
   gearBtn.onclick = () => { gearBtn.blur(); sfx.click(); ui.onGear && ui.onGear(); };
   hud.append(hudDay, hudPat, hudMoney, h('div', 'spacer'), muteBtn, fsBtn, gearBtn);
-  ui.syncMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; };
+  ui.syncMute = () => { muteBtn.innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); };
   ui.showHUD = v => hud.classList.toggle('hidden', !v);
   let shownMoney = null;
   ui.setHUD = ({ day, patient, money, label }) => {
@@ -66,7 +80,7 @@ export function createUI(root, E) {
   const timerEl = layer('timer hidden');
   ui.timer = {
     show(sec) { timerEl.classList.remove('hidden'); this.set(sec); },
-    set(sec) { const s = Math.max(0, Math.ceil(sec)); timerEl.textContent = '⏱ ' + s; timerEl.classList.toggle('low', s <= 5); },
+    set(sec) { const s = Math.max(0, Math.ceil(sec)); timerEl.innerHTML = icon('timer', 'in') + ' ' + s; timerEl.classList.toggle('low', s <= 5); },
     hide() { timerEl.classList.add('hidden'); },
   };
 
@@ -121,7 +135,7 @@ export function createUI(root, E) {
   const nBody = h('div', 'nurse-body');
   const nName = h('div', 'nurse-name', 'Nurse Pat');
   const nText = h('div', 'nurse-text');
-  const nBtn = h('button', 'btn small', 'Next ▸');
+  const nBtn = h('button', 'btn small', 'Next');
   nBody.append(nName, nText);
   nurse.append(nAvatar, nBody, nBtn);
   let nurseResolve = null;
@@ -134,7 +148,7 @@ export function createUI(root, E) {
     sfx.babble(text.replace(/<[^>]+>/g, ''), 1.25);
     const wait = o.wait !== false;
     nBtn.classList.toggle('hidden', !wait);
-    nBtn.textContent = o.button || 'Next ▸';
+    nBtn.textContent = o.button || 'Next';
     if (!wait) { nurseResolve = null; return Promise.resolve(); }
     return new Promise(res => { nurseResolve = () => { if (o.hide !== false) nurse.classList.add('hidden'); res(); }; });
   };
@@ -151,7 +165,7 @@ export function createUI(root, E) {
       h('div', 'chart-row', `<b>Age:</b> ${c.ageLabel}`),
       h('div', 'chart-row complaint', `<b>Complaint:</b> “${c.complaint}”`),
     );
-    if (o.note) chart.append(h('div', 'chart-note', `✎ <b>Nurse's note:</b> ${o.note}`));
+    if (o.note) chart.append(h('div', 'chart-note', `${icon('pencil', 'in')} <b>Nurse's note:</b> ${o.note}`));
     if (c.steps.length > 1) chart.append(h('div', 'chart-row small', `Needs ${c.steps.length} things today.`));
     chart.classList.remove('hidden');
   };
@@ -165,6 +179,7 @@ export function createUI(root, E) {
     const row = h('div', 'tray-row');
     for (const t of TOOLS) {
       const b = h('button', 'tool interactive' + (o.highlight === t.id ? ' glow' : ''), `${ICONS[t.id]}<span>${t.label}</span>`);
+      b.dataset.tool = t.id;
       b.onclick = () => { sfx.click(); res(t.id); };
       row.appendChild(b);
     }
@@ -271,7 +286,7 @@ export function createUI(root, E) {
     await ui.card({ title, icon, html: '<ul class="howto">' + lines.map(l => `<li>${l}</li>`).join('') + '</ul>', buttons: [{ label: "Got it!", value: true }], cls: 'howto-card' });
     return true;
   };
-  ui.stars = n => '<span class="stars">' + [0, 1, 2].map(i => `<span class="star ${i < n ? 'on' : ''}" style="animation-delay:${0.15 + i * 0.18}s">★</span>`).join('') + '</span>';
+  ui.stars = n => '<span class="stars">' + [0, 1, 2].map(i => `<span class="star ${i < n ? 'on' : ''}" style="animation-delay:${0.15 + i * 0.18}s">${icon(i < n ? 'star' : 'starOff')}</span>`).join('') + '</span>';
 
   // ---------- touch controls (chase) ----------
   const touch = layer('touch hidden');

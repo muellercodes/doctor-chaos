@@ -2,6 +2,7 @@
 import { clamp, rand, pick } from '../engine.js';
 import { sfx, music } from '../audio.js';
 import { h } from '../ui.js';
+import { icon, drawIcon } from '../icons.js';
 
 const VH = 470;
 const GROUND = 412;
@@ -19,8 +20,8 @@ export async function play(G, P) {
     `${c.first} ran off! <b>Chase them down the hallway</b> before they reach the EXIT.`,
     'Move: <b>← →</b> or <b>A D</b>. Jump: <b>↑</b>, <b>W</b> or <b>Space</b>. (Touch: use the buttons.)',
     'Jump over wet floor signs, carts and wheelchairs. Land ON things to bounce off them!',
-    'Grab <b>☕ coffee</b> for a speed boost.',
-  ], '🏃');
+    `Grab <b>${icon('coffee', 'in')} coffee</b> for a speed boost.`,
+  ], icon('runner'));
   const canvas = document.getElementById('c2d');
   const ctx = canvas.getContext('2d');
   canvas.classList.remove('hidden');
@@ -40,10 +41,10 @@ export async function play(G, P) {
     b.addEventListener('pointerdown', on); b.addEventListener('pointerup', offf); b.addEventListener('pointerleave', offf); b.addEventListener('pointercancel', offf);
     tc.appendChild(b);
   };
-  mk('left', '◀', 'left'); mk('right', '▶', 'right'); mk('jump', '⤒', 'jump');
+  mk('left', icon('left'), 'left'); mk('right', icon('right'), 'right'); mk('jump', icon('up'), 'jump');
   tc.classList.remove('hidden');
 
-  const diff = G.diff;
+  const diff = Math.min(1, G.diff); // the runner can never be faster than you
   const L = Math.round(5400 + diff * 1400);
   const obs = [];
   const pickups = [];
@@ -113,7 +114,7 @@ export async function play(G, P) {
     let dt = Math.min(0.033, (now - last) / 1000); last = now;
     if (G.E.paused) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const cw = Math.round(window.innerWidth * dpr), chh = Math.round(window.innerHeight * dpr);
+    const cw = Math.round((canvas.clientWidth || window.innerWidth) * dpr), chh = Math.round((canvas.clientHeight || window.innerHeight) * dpr);
     if (canvas.width !== cw || canvas.height !== chh) { canvas.width = cw; canvas.height = chh; }
     const scale = canvas.height / VH;
     const VW = canvas.width / scale;
@@ -169,7 +170,7 @@ export async function play(G, P) {
         if (!pu.alive) continue;
         if (Math.abs(pl.x + pl.w / 2 - pu.x) < 30 && pl.y - pl.h < pu.y + 15 && pl.y > pu.y - 15) {
           pu.alive = false;
-          if (pu.type === 'coffee') { pl.boost = 3.5; sfx.coin(); pop('☕ SPEED!', pu.x, pu.y - 20, '#ff8a2a'); }
+          if (pu.type === 'coffee') { pl.boost = 3.5; sfx.coin(); pop('SPEED!', pu.x, pu.y - 20, '#ff8a2a'); }
           else { G.addMoney(5); sfx.coin(); pop('+$5', pu.x, pu.y - 20, '#2a9d8f'); }
         }
       }
@@ -272,12 +273,12 @@ export async function play(G, P) {
     ctx.fillStyle = '#56707f'; roundRect(ctx, bx, by + 6, bw, 10, 5); ctx.fill();
     const mx = v => bx + clamp(v / (L + 60), 0, 1) * bw;
     ctx.font = '22px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('🚪', bx + bw + 2, by + 18);
+    drawIcon(ctx, 'door', bx + bw + 4, by + 11, 26);
     ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.arc(mx(pa.x), by + 11, 9, 0, 7); ctx.fill();
     ctx.fillStyle = coat; ctx.strokeStyle = '#1d2b36'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(mx(pl.x), by + 11, 9, 0, 7); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = '700 16px Fredoka, Arial'; ctx.textAlign = 'left';
     ctx.fillText(`Catch ${c.first}!`, bx - 4, by + 54);
-    if (pl.boost > 0) { ctx.fillStyle = '#ff8a2a'; ctx.textAlign = 'right'; ctx.fillText(`☕ ${pl.boost.toFixed(1)}s`, bx + bw, by + 54); }
+    if (pl.boost > 0) { ctx.fillStyle = '#ff8a2a'; ctx.textAlign = 'right'; ctx.fillText(`${pl.boost.toFixed(1)}s`, bx + bw, by + 54); drawIcon(ctx, 'coffee', bx + bw - 52, by + 48, 20); }
     if (state === 'intro') banner(ctx, VW, stateT < 0.9 ? `CATCH ${c.first.toUpperCase()}!` : 'GO!', '#ff8a2a');
     if (state === 'caught') banner(ctx, VW, 'GOTCHA!', '#2ec4b6');
     if (state === 'escaped') banner(ctx, VW, `${c.first.toUpperCase()} ESCAPED!`, '#e63946');

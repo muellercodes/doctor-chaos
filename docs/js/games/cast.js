@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp, pick, canvasTexture } from '../engine.js';
 import { h } from '../ui.js';
 import { armSetup } from './shot.js';
+import { icon } from '../icons.js';
 
 const COLORS = [
   { id: 'orange', label: 'Orange', hex: '#ff8a2a' },
@@ -23,7 +24,7 @@ export async function play(G, P) {
     '<b>Drag the hand</b> slowly to straighten the arm. Too fast hurts!',
     '<b>Draw circles</b> around the glowing ring to wrap the cast. Not too fast or it gets too tight!',
     'Then sign the cast if you want.',
-  ], '🦴');
+  ], icon('bone'));
   const S = E.scope();
   const side = 'R';
   person.off.elR = [0, 0, 0];
@@ -111,14 +112,14 @@ export async function play(G, P) {
   // ---- wrap ----
   person.snap();
   const a = person.armInfo(side);
-  const castMat = new THREE.MeshToonMaterial({ color: col.hex }); castMat.userData.dispose = true;
+  const castMat = new THREE.MeshStandardMaterial({ color: col.hex }); castMat.userData.dispose = true;
   const NW = 7;
   const wrist = a.wrist.clone(), elbow = a.elbow.clone().lerp(a.wrist, 0.08);
   const axis = elbow.clone().sub(wrist);
   const segLen = axis.length() / NW;
   axis.normalize();
   const castR = 0.062 * s;
-  const ringGuide = S.dom(h('div', 'wrap-guide'));
+  const ringGuide = S.dom(h('div', 'wrap-guide', `<span class="wrap-arrow">${icon('rotate')}</span>`));
   ui.root.appendChild(ringGuide);
   const tightM = ui.meter({ label: 'Tightness', vertical: true, marker: true, zones: [{ from: 0, to: 0.7, color: '#7be495' }, { from: 0.7, to: 1, color: '#ff8b8b' }] });
   const wrapM = ui.meter({ label: 'Wrapped', value: 0, fill: col.hex });
@@ -175,7 +176,7 @@ export async function play(G, P) {
   // ---- sign ----
   bands.forEach(b => (b.visible = false));
   const tex = canvasTexture(512, 256, (ctx, W, H) => { ctx.fillStyle = col.hex; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 3; for (let x = 0; x < W; x += 24) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 40, H); ctx.stroke(); } });
-  const signMat = new THREE.MeshToonMaterial({ map: tex.tex }); signMat.userData.dispose = true;
+  const signMat = new THREE.MeshStandardMaterial({ map: tex.tex }); signMat.userData.dispose = true;
   const full = new THREE.Mesh(new THREE.CylinderGeometry(castR, castR, segLen * NW, 32, 1, true), signMat);
   full.position.copy(wrist.clone().lerp(elbow, 0.5));
   full.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
@@ -198,7 +199,7 @@ export async function play(G, P) {
     lastUV = { x, y };
     tex.tex.needsUpdate = true;
   });
-  await ui.actions([{ label: 'Done ✓', value: true, cls: 'primary' }]);
+  await ui.actions([{ label: 'Done', value: true, cls: 'primary' }]);
   ui.hint(null);
   person.expr('happy');
   sfx.great();

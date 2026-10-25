@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp, rand, pick } from '../engine.js';
 import { h } from '../ui.js';
 import { route, SPOTS } from '../nav.js';
+import { icon } from '../icons.js';
 
 export async function play(G, P) {
   const { E, ui, sfx, room } = G;
@@ -10,7 +11,7 @@ export async function play(G, P) {
     `${P.c.first} saw the needle and <b>hid somewhere in the room</b>!`,
     '<b>Watch and listen</b> for wiggles and giggles (the giggle is louder on the side they are hiding).',
     '<b>Click</b> the hiding spot to find them. Fewer guesses = better score!',
-  ], '🙈');
+  ], icon('peek'));
   const S = E.scope();
   // poof!
   sfx.whoosh();

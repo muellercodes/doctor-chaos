@@ -10,7 +10,42 @@ function m(geo, color, opts) {
 const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const C = (rt, rb, h, s = 16) => new THREE.CylinderGeometry(rt, rb, h, s);
 const S = (r, s = 16) => new THREE.SphereGeometry(r, s, Math.round(s * 0.7));
-const glassMat = () => { const mm = new THREE.MeshToonMaterial({ color: '#e3f6ff', transparent: true, opacity: 0.45 }); mm.userData.dispose = true; return mm; };
+const glassMat = () => { const mm = new THREE.MeshStandardMaterial({ color: '#e3f6ff', transparent: true, opacity: 0.45 }); mm.userData.dispose = true; return mm; };
+
+// ---------------- DOCTOR'S HAND ----------------
+// A gloved hand that grips along its local Y axis. The forearm always points toward the
+// bottom right of the view (like your own right arm reaching in), whatever the tool is doing.
+const ARM_DIR = new THREE.Vector3(0.42, -0.58, 0.7).normalize();
+const _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+export function gloveHand(coat = '#ffffff') {
+  const g = new THREE.Group();
+  const glove = '#5aa9e6';
+  const fist = m(S(0.026, 18), glove, { roughness: 0.45 }); fist.scale.set(1.15, 1.3, 1.0); g.add(fist);
+  for (let i = 0; i < 4; i++) { const k = m(S(0.0085, 10), glove, { roughness: 0.45 }); k.position.set(0.021, -0.02 + i * 0.0135, 0.014); g.add(k); }
+  const thumb = m(new THREE.CapsuleGeometry(0.0085, 0.022, 4, 8), glove, { roughness: 0.45 }); thumb.position.set(-0.016, 0.026, 0.012); thumb.rotation.set(0.4, 0, 0.5); g.add(thumb);
+  const arm = new THREE.Group(); g.add(arm);
+  const wrist = m(C(0.019, 0.022, 0.06, 14), glove, { roughness: 0.45 }); wrist.position.y = 0.04; arm.add(wrist);
+  const cuff = m(new THREE.TorusGeometry(0.023, 0.005, 6, 16), glove, { roughness: 0.45 }); cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.07; arm.add(cuff);
+  const sleeve = m(C(0.034, 0.04, 0.42, 16), coat); sleeve.position.y = 0.28; arm.add(sleeve);
+  const sleeveEnd = m(new THREE.TorusGeometry(0.034, 0.006, 6, 18), coat); sleeveEnd.rotation.x = Math.PI / 2; sleeveEnd.position.y = 0.075; arm.add(sleeveEnd);
+  arm.updateMatrixWorld = function (force) {
+    if (this.parent) {
+      this.parent.matrixWorld.decompose(_v, _pq, _s);
+      _q.setFromUnitVectors(_up, ARM_DIR);
+      this.quaternion.copy(_pq.invert().multiply(_q));
+      this.matrixWorldNeedsUpdate = true;
+    }
+    THREE.Object3D.prototype.updateMatrixWorld.call(this, force);
+  };
+  g.traverse(o => { o.castShadow = false; });
+  return g;
+}
+export function holdWith(tool, coat, pos, rot = [0, 0, 0], scale = 1) {
+  const hnd = gloveHand(coat);
+  hnd.position.set(...pos); hnd.rotation.set(...rot); hnd.scale.setScalar(scale);
+  tool.add(hnd);
+  return hnd;
+}
 
 // ---------------- TOOLS ----------------
 // Syringe: needle tip at origin, barrel extends along +Y.
@@ -117,7 +152,7 @@ export function clipboard() {
 
 export function mask() {
   const g = new THREE.Group();
-  const cup = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshToonMaterial({ color: '#b2fab4', transparent: true, opacity: 0.8 }));
+  const cup = new THREE.Mesh(new THREE.SphereGeometry(0.07, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#b2fab4', transparent: true, opacity: 0.8 }));
   cup.material.userData.dispose = true;
   cup.rotation.x = -Math.PI / 2; g.add(cup);
   const tube = m(C(0.015, 0.015, 0.12, 10), '#81c784'); tube.position.z = 0.1; tube.rotation.x = Math.PI / 2; g.add(tube);

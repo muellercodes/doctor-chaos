@@ -29,7 +29,7 @@ function stripeMat(a, b, n = 8) {
   const { tex } = canvasTexture(64, 64, (ctx, W, H) => {
     for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? b : a; ctx.fillRect(0, (i * H) / n, W, H / n + 1); }
   });
-  const m = new THREE.MeshToonMaterial({ map: tex });
+  const m = new THREE.MeshStandardMaterial({ map: tex });
   stripeCache.set(key, m);
   return m;
 }
@@ -245,7 +245,8 @@ class Face {
 // ---------------- POSES ----------------
 const JOINTS = ['spine', 'neck', 'head', 'shL', 'shR', 'elL', 'elR', 'hipL', 'hipR', 'knL', 'knR'];
 const BASE = { spine: [0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0], shL: [0, 0, 0.07], shR: [0, 0, -0.07], elL: [0, 0, 0], elR: [0, 0, 0], hipL: [0, 0, 0], hipR: [0, 0, 0], knL: [0, 0, 0], knR: [0, 0, 0] };
-const SIT = { hipL: [-1.52, 0, 0.07], hipR: [-1.52, 0, -0.07], knL: [1.48, 0, 0], knR: [1.48, 0, 0], shL: [-0.28, 0, 0.12], shR: [-0.28, 0, -0.12], elL: [-0.75, 0, 0], elR: [-0.75, 0, 0] };
+// sitting: hands resting on the thighs instead of hanging off the table
+const SIT = { hipL: [-1.52, 0, 0.07], hipR: [-1.52, 0, -0.07], knL: [1.48, 0, 0], knR: [1.48, 0, 0], shL: [-0.24, 0, 0.09], shR: [-0.24, 0, -0.09], elL: [-0.62, 0, -0.34], elR: [-0.62, 0, 0.34] };
 export const POSES = {
   stand: {},
   sit: SIT,

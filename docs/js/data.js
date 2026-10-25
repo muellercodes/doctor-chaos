@@ -2,7 +2,7 @@ import { pick, shuffle, randi, rand } from './engine.js';
 import { OBJECT_NAMES } from './props.js';
 import { pickExcuse, uniqueLine } from './excuses.js';
 
-export const STEP_TOOL = { removal: 'tweezers', shot: 'shot', blood: 'blood', surgery: 'surgery', reflex: 'reflex', steth: 'steth', cast: 'cast', babyshot: 'shot' };
+export const STEP_TOOL = { removal: 'tweezers', shot: 'shot', blood: 'blood', surgery: 'surgery', reflex: 'reflex', steth: 'steth', cast: 'cast', babyshot: 'shot', thermo: 'thermo', bp: 'bp', otoscope: 'otoscope', drops: 'drops', bandage: 'bandage', xray: 'xray' };
 export const STEP_NOTE = {
   removal: 'Something stuck. Use the <b>tweezers</b>.',
   shot: 'Needs a shot. Use the <b>syringe</b>.',
@@ -12,6 +12,12 @@ export const STEP_NOTE = {
   reflex: 'Check reflexes with the <b>reflex hammer</b>.',
   steth: 'Listen to the heart with the <b>stethoscope</b>.',
   cast: 'Broken arm. Needs a <b>cast</b>.',
+  thermo: 'Might have a fever. Use the <b>thermometer</b>.',
+  bp: 'Check blood pressure with the <b>pressure cuff</b>.',
+  otoscope: 'Something is going on in that ear. Look with the <b>ear scope</b>.',
+  drops: 'Itchy, red eyes. Use the <b>eye drops</b>.',
+  bandage: 'Has a scrape. Clean it and put on a <b>bandage</b>.',
+  xray: 'Might be broken. Take an <b>X-ray</b> first.',
 };
 
 const SKIN = ['#ffe0c4', '#f9d0b0', '#f1c27d', '#e0ac69', '#c68642', '#a0662e', '#8d5524', '#5c3a21'];
@@ -122,6 +128,12 @@ export const WRONG_TOOL = {
   reflex: ['Why are you holding a tiny hammer?', 'If you bonk me with that, I bonk you back.', 'Is this a doctor visit or a game of whack-a-mole?'],
   steth: ["You're listening to my heart? It's saying 'wrong tool.'", 'My heart is fine! It\'s the OTHER thing!', 'My heart is beating very fast. Because you picked the wrong tool.'],
   cast: ["A cast? Nothing's broken! ...Yet.", "I don't need a cast. Is that a threat?", 'Wrapping me up like a burrito will NOT fix this.'],
+  thermo: ['A thermometer? I am not a turkey.', "I don't have a fever. I have a PROBLEM.", 'Do not put that in my mouth. Please read the chart.'],
+  bp: ['My blood pressure is fine. It is about to not be fine.', 'Why are you trying to hug my arm with that?', 'That is for squeezing. I need fixing.'],
+  otoscope: ['Why are you looking in my ear? The problem is NOT in my ear.', 'My ears are fine. My ears have never been better.', 'Hello? Is anyone in there? No. Good. Wrong tool.'],
+  drops: ['Eye drops? My eyes are the only part of me that works!', 'Do not drip anything on me. Read the chart.', "If you put that in my eye I am going to blink forever."],
+  bandage: ['A bandage will not fix this. Trust me.', 'Where are you going to put that? There is no scrape!', "I don't need a sticker, I need a doctor."],
+  xray: ['An X-ray? Nothing is broken! You will see my skeleton for NO reason.', 'Please do not look at my bones. They are private.', 'I am not posing for my skeleton picture today.'],
 };
 export const NURSE_QUIPS = ['Doctor... maybe read the chart?', "I've seen worse. Not much worse.", 'I just work here.', 'Remember, they can sue.', 'Deep breaths. For you, not them.',
   'The chart is the clipboard. With the words on it.', 'I am going to pretend I did not see that.', 'Should I call a real doctor? Kidding. Mostly.', 'That is a bold choice, Doctor.', 'I have a lawyer on speed dial. Just saying.', 'Interesting. Wrong, but interesting.', 'Try the one that matches the problem.'];
@@ -155,6 +167,12 @@ export const LAWSUIT = {
   steth: 'The doctor tickled me for ten minutes and called it a checkup.',
   scooter: "I escaped on a scooter and the doctor let me. Now I'm suing for my own escape. It makes sense to me.",
   triplets: "The doctor gave a shot to the WRONG triplet. Twice. Our mom is very upset. And confused.",
+  thermo: 'The doctor let the thermometer fall out three times. I now know every joke about thermometers.',
+  bp: 'The doctor squeezed my arm so many times it is now shaped like a balloon animal.',
+  otoscope: 'The doctor looked in my ear for ten minutes and found nothing. There was a WHOLE LEGO in there.',
+  drops: 'I came in with itchy eyes. I left with a wet face, a wet shirt, and still itchy eyes.',
+  bandage: 'The bandage is on my elbow. The scrape is on my knee. I would like a refund.',
+  xray: 'The doctor took six blurry X-rays. My skeleton looks like a ghost. A sad ghost.',
 };
 export const REVIEWS = {
   3: ['Barely felt a thing. Would get injured again.', 'Fast, friendly, and only a little terrifying.', 'Gave me a lollipop AND my dignity back.', '10/10. The doctor did not scream even once.', 'Best doctor I ever had. And I have had SEVEN this year.', 'I would let this doctor fix my car. That is a compliment.', 'Five stars. Would have given six but the chairs are lumpy.', 'My mom cried. Good tears. I think.', 'Professional, gentle, and the bandage was a nice color.'],
@@ -163,6 +181,7 @@ export const REVIEWS = {
   0: ['My lawyer will be in touch.', 'Do not recommend. My cat would have done better.', "I'm telling EVERYONE. Even my dentist.", 'I would give zero stars but the app will not let me.', 'Worst visit since the time I visited a volcano.', 'I left a review on every website. Even the weather one.'],
 };
 export const WELCOME_BACK = ['Nurse Pat kept your chair warm. She was sitting in it.', 'The patient waited. They read every magazine. Twice.', 'Nobody noticed you were gone. Nurse Pat noticed.', 'The waiting room clock moved. Everything else stayed exactly the same.', 'Your coffee is cold now. That is on you.', 'The next patient has been practicing their excuse.'];
+export const BILLS = ['Bills: rent, bandages, and a LOT of lollipops.', "Bills: Nurse Pat's coffee is not cheap.", 'Bills: the X-ray machine runs on money, apparently.', 'Bills: someone keeps stealing the good pens.', 'Bills: the vending machine charged the clinic. For itself.', 'Bills: 400 tongue depressors. Nobody knows why.', 'Bills: the electricity, the water, and one very fancy stapler.'];
 export const FORECAST = ['Forecast: 100% chance of chaos.', "The hospital's insurance company sent flowers. And a warning.", 'Nurse Pat brought donuts. Either nice or a bribe.', 'The waiting room smells like fear and hand sanitizer.', 'Rumor has it someone in the waiting room is wearing a cape.', "Today's lunch special: hospital pudding. Again.",
   'The vending machine is out of everything except one sad raisin.', 'Someone left a goose in the parking lot. Not a patient. Probably.', 'The elevator music today is just one guy humming.', 'Nurse Pat is in a great mood. Nobody knows why. Everyone is nervous.', 'A kid in the waiting room is building a fort out of chairs.', 'The coffee machine made a noise like a dying robot. Coffee is canceled.',
   'Somebody stole all the good pens. Again.', 'The hospital cat is wearing a stethoscope. It is doing better than you.', 'There is a mysterious puddle in hallway B. Do not step in it.', 'The front desk phone has rung 400 times. Nobody answered it.', 'A pigeon got into the lobby and is now the most popular patient.', 'The janitor says today "feels like a sneezy one."'];
@@ -399,7 +418,7 @@ export const personaPatient = (name, used = new Set()) => (PERSONALITIES[name] ?
 export const testSpecialPatient = (type, used = new Set()) => specialPatient(type, pick(['kid', 'teen', 'adult', 'elder']), pick(['m', 'f']), used);
 
 // ---------- day generation ----------
-const ALL_STEPS = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'cast'];
+const ALL_STEPS = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'cast', 'thermo', 'bp', 'otoscope', 'drops', 'bandage', 'xray'];
 
 // opts.used: Set of excuses already said (saved between days and updated here)
 // opts.special: which special mini-game patient comes today (or null)

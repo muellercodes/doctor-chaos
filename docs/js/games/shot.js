@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { syringe, swab, bandage } from '../props.js';
+import { syringe, swab, bandage, holdWith } from '../props.js';
 import { clamp, rand } from '../engine.js';
+import { icon } from '../icons.js';
 
 export async function armSetup(G, P, side = 'R', focus = 'upper') {
   const { E } = G;
@@ -30,7 +31,7 @@ export async function play(G, P, prm = {}) {
     '<b>Scrub</b> the yellow circle with the alcohol swab (hold and wiggle).',
     'Move the needle to the circle. It tilts back and forth. <b>Click when it lines up</b> with the dotted guide.',
     '<b>Hold</b> to push the plunger. Keep the pressure in the <b>green</b>. Too fast hurts!',
-  ], '💉');
+  ], icon('shot'));
   const S = E.scope();
   const side = 'R';
   const a = await armSetup(G, P, side, 'upper');
@@ -40,7 +41,7 @@ export async function play(G, P, prm = {}) {
   const R = 0.034 * s * G.tol * (G.tutorial ? 1.3 : 1);
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -(target.z + 0.012));
   G.dbg = { kind: 'shot', phase: 'clean', target, R };
-  const diff = G.tutorial ? 0 : G.diff;
+  const diff = G.tutorial ? 0 : Math.min(1.3, G.diff);
 
   // target ring
   const ringMat = new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.95 }); ringMat.userData.dispose = true;
@@ -52,6 +53,7 @@ export async function play(G, P, prm = {}) {
   // -------- phase 1: clean --------
   ui.hint('Hold and <b>scrub</b> the yellow circle with the alcohol swab!');
   const sw = swab(); sw.scale.setScalar(s * 1.2); sw.rotation.x = 0.9; S.add(sw);
+  holdWith(sw, G.coatColor || '#ffffff', [0, 0.1, 0], [0, 0, 0], 0.9);
   const cleanM = ui.meter({ label: 'Clean', value: 0, fill: '#5dd6ff' });
   let clean = 0, last = null, saidCold = false;
   await new Promise(res => {
@@ -69,7 +71,7 @@ export async function play(G, P, prm = {}) {
       if (clean >= 1) { off(); res(); }
     });
   });
-  sfx.good(); ui.popAt(target, 'Squeaky clean! ✨', 'good');
+  sfx.good(); ui.popAt(target, 'Squeaky clean!', 'good');
   cleanM.remove();
   sw.visible = false;
 
@@ -81,6 +83,7 @@ export async function play(G, P, prm = {}) {
   ghost.position.copy(target); ghost.position.z += 0.004; ghost.rotation.z = base - Math.PI / 2;
   S.add(ghost);
   const syr = syringe(prm.liquid || '#7fdbff'); syr.scale.setScalar(s * 1.6); S.add(syr);
+  holdWith(syr, G.coatColor || '#ffffff', [0, 0.16, 0]);
   const amp = 0.75;
   const omega = 1.9 + diff * 1.6;
   const green = 0.2 * G.tol * (G.tutorial ? 1.4 : 1);
@@ -150,8 +153,11 @@ export async function play(G, P, prm = {}) {
     const rate = (0.95 + diff * 0.7);
     await new Promise(res => {
       const off = S.update(dt => {
+        const prev = pr;
         if (E.input.down) pr += dt * rate * (1 + pr * 0.6); else pr -= dt * 1.5;
         pr = clamp(pr, 0, 1.05);
+        // on a slow device one long frame could jump straight from green to "ouch"; show the yellow first
+        if (pr >= 0.86 && prev < gHi) pr = 0.85;
         if (E.input.down && pr > 0.12 && pr < 0.86) prog += dt * (pr >= gLo && pr <= gHi ? 0.34 : 0.16);
         if (pr >= 0.86) {
           pressMiss++; pr = 0.35;

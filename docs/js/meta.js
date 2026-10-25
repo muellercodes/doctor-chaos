@@ -2,6 +2,8 @@
 // accounts, cloud saves and leaderboards.
 import { sfx, music } from './audio.js';
 import { h } from './ui.js';
+import { icon } from './icons.js';
+export { icon };
 
 export const VERSION = '1.4.0';
 
@@ -44,7 +46,7 @@ export function panel(build, { cls = '' } = {}) {
     overlay.innerHTML = '';
     overlay.classList.remove('hidden');
     const card = h('div', 'card panel ' + cls);
-    const x = h('button', 'panel-x', '✕'); x.setAttribute('aria-label', 'Close');
+    const x = h('button', 'panel-x', icon('close')); x.setAttribute('aria-label', 'Close');
     card.appendChild(x);
     const close = v => { if (panelClose !== close) return; panelClose = null; overlay.classList.add('hidden'); overlay.innerHTML = ''; res(v); };
     panelClose = close;
@@ -68,70 +70,72 @@ export function message({ icon = '', title = '', html = '', buttons = [{ label: 
 }
 
 // A found secret: shows a note and remembers it.
-export function secret(id, { icon = '🤫', title = 'Secret found!', html = '' } = {}) {
+export function secret(id, { icon: ic = icon('sparkle'), title = 'Secret found!', html = '' } = {}) {
   const first = !profile.secrets[id];
   profile.secrets[id] = profile.secrets[id] || Date.now();
   saveProfile();
   sfx.ding && sfx.ding();
-  return message({ icon, title: first ? title : title + ' (again)', html, cls: 'secret-card', buttons: [{ label: 'Nice', value: true, cls: 'primary' }] });
+  return message({ icon: ic, title: first ? title : title + ' (again)', html, cls: 'secret-card', buttons: [{ label: 'Nice', value: true, cls: 'primary' }] });
 }
 
 // ---------------- achievements ----------------
 export const ACHIEVEMENTS = [
-  { id: 'first_patient', icon: '🩺', name: 'First Day Jitters', desc: 'Treat your first patient.' },
-  { id: 'orientation', icon: '🎓', name: 'Orientation Survivor', desc: "Finish Nurse Pat's orientation." },
-  { id: 'three_stars', icon: '⭐', name: 'Gold Star', desc: 'Get 3 stars on a patient.' },
-  { id: 'perfect_day', icon: '🌟', name: 'Flawless Shift', desc: 'Get all 15 stars in one day.' },
-  { id: 'day5', icon: '📅', name: 'Work Week', desc: 'Reach day 5.' },
-  { id: 'day10', icon: '🗓️', name: 'Double Digits', desc: 'Reach day 10.' },
-  { id: 'day25', icon: '🏅', name: 'Clinic Legend', desc: 'Reach day 25.' },
-  { id: 'day50', icon: '👴', name: 'Retirement Is a Myth', desc: 'Reach day 50.' },
-  { id: 'money1k', icon: '💵', name: 'Four Figures', desc: 'Have $1,000 in the bank.' },
-  { id: 'money5k', icon: '💰', name: 'Doctor Moneybags', desc: 'Have $5,000 in the bank.' },
-  { id: 'money20k', icon: '🏦', name: 'Basically a Bank', desc: 'Have $20,000 in the bank.' },
-  { id: 'patients25', icon: '👥', name: 'Full Waiting Room', desc: 'Treat 25 patients.' },
-  { id: 'patients100', icon: '🏥', name: 'Hundred Club', desc: 'Treat 100 patients.' },
-  { id: 'tips10', icon: '🫙', name: 'Tip Jar', desc: 'Get 10 tips from happy patients.' },
-  { id: 'first_lawsuit', icon: '⚖️', name: 'Lawyered', desc: 'Get sued for the first time.' },
-  { id: 'lawsuits10', icon: '📜', name: 'Frequent Defendant', desc: 'Get sued 10 times. The judge knows your name now.' },
-  { id: 'mega_lawsuit', icon: '💥', name: 'Objection!', desc: 'Get hit with a MEGA lawsuit.' },
-  { id: 'bankrupt', icon: '🥫', name: 'Replaced by a Vending Machine', desc: 'Go bankrupt.' },
-  { id: 'caught_runner', icon: '🏃', name: 'Hallway Monitor', desc: 'Catch a runaway patient.' },
-  { id: 'caught_scooter', icon: '🦽', name: 'Wheelchair Grand Prix', desc: 'Catch the scooter thief.' },
-  { id: 'germ_king', icon: '👑', name: 'Royal Pain', desc: 'Defeat the King Germ.' },
-  { id: 'triplets_first', icon: '👯', name: 'Triplet Detector', desc: 'Pick the sick triplet on the first try.' },
-  { id: 'lights_found', icon: '🔦', name: 'Night Vision', desc: 'Find the kid in the dark.' },
-  { id: 'hider_found', icon: '🙈', name: 'Hide and Seek Champion', desc: 'Find a hiding patient.' },
-  { id: 'baby_calm', icon: '🍼', name: 'Baby Whisperer', desc: 'Give a baby their shot.' },
-  { id: 'all_specials', icon: '🎪', name: 'Seen It All', desc: 'Meet every kind of special patient.' },
-  { id: 'maxed', icon: '🛠️', name: 'Fully Loaded', desc: 'Max out every upgrade.' },
-  { id: 'fashion', icon: '🥼', name: 'Fashion Doctor', desc: 'Change your coat color.' },
-  { id: 'kicked', icon: '🦶', name: 'Face, Meet Foot', desc: 'Get kicked in the face during a reflex test.' },
-  { id: 'hammer_time', icon: '🔨', name: 'Hammer Time', desc: 'Bonk the wrong spot 3 times in a row.' },
-  { id: 'wrong_tools', icon: '🪛', name: 'Is This a Scalpel?', desc: 'Pick the wrong tool 5 times on one patient.' },
-  { id: 'zero_day', icon: '🫠', name: 'Zero Stars, Full Heart', desc: 'Finish a whole day with zero stars.' },
-  { id: 'in_debt', icon: '📉', name: 'Negative Vibes', desc: 'Have less than $0 in the bank.' },
-  { id: 'vampire_blood', icon: '🧛', name: 'Blood Bank', desc: 'Take blood from a vampire. He is not thrilled.' },
-  { id: 'escaped', icon: '💨', name: 'They Went That Way', desc: 'Let a patient escape.' },
-  { id: 'code1', icon: '🔐', name: 'Code Breaker', desc: 'Enter a secret code.' },
-  { id: 'code_all', icon: '🕵️', name: 'Master Hacker', desc: 'Enter every secret code.' },
-  { id: 'night_owl', icon: '🦉', name: 'Night Shift (Literally)', desc: 'Play between midnight and 4 AM.', secret: true },
-  { id: 'konami', icon: '🕹️', name: 'Old School', desc: 'Enter a very old cheat code on the title screen.', secret: true },
-  { id: 'tacos', icon: '🌮', name: 'Taco Tuesday', desc: 'Make it rain tacos.', secret: true },
-  { id: 'roach', icon: '🪳', name: 'Health Code Violation', desc: 'Find the roach.', secret: true },
-  { id: 'linus', icon: '🧠', name: 'The Boss', desc: "Say the designer's name.", secret: true },
-  { id: 'fine_print', icon: '🔍', name: 'Fine Print', desc: 'Find the hidden tagline.', secret: true },
-  { id: 'secret_song', icon: '🎵', name: 'Secret Song', desc: 'Find the secret song.', secret: true },
-  { id: 'poke_demo', icon: '👉', name: 'Stop Poking Me', desc: 'Poke the patient on the title screen. A lot.', secret: true },
-  { id: 'dev_mode', icon: '🧑‍💻', name: 'Not a Developer', desc: 'Try to unlock developer mode.', secret: true },
-  { id: 'waiting', icon: '😴', name: 'Waiting Room Champion', desc: 'Sit on the title screen for 3 whole minutes.', secret: true },
-  { id: 'clock', icon: '⏰', name: 'Time Traveler', desc: 'Mess with the clock.', secret: true },
-  { id: 'plant', icon: '🪴', name: 'Plant Whisperer', desc: 'Give the plant some attention.', secret: true },
-  { id: 'nurse_poke', icon: '🗣️', name: 'Nurse Pat Knows Things', desc: 'Bother Nurse Pat until she tells you something.', secret: true },
-  { id: 'sound_toggle', icon: '🔇', name: 'Sound of Silence', desc: 'Turn the sound off and on 10 times in a row.', secret: true },
-  { id: 'coffee', icon: '☕', name: 'Coffee Break', desc: 'Leave a patient waiting for 2 minutes. They grew a beard.', secret: true },
-  { id: 'ach20', icon: '🏆', name: 'Achievement Hunter', desc: 'Unlock 20 achievements.' },
-  { id: 'ach_all', icon: '🌱', name: 'Touch Grass', desc: 'Unlock every other achievement. Then go outside.' },
+  { id: 'first_patient', icon: 'stethoscope', name: 'First Day Jitters', desc: 'Treat your first patient.' },
+  { id: 'orientation', icon: 'gradcap', name: 'Orientation Survivor', desc: "Finish Nurse Pat's orientation." },
+  { id: 'three_stars', icon: 'star', name: 'Gold Star', desc: 'Get 3 stars on a patient.' },
+  { id: 'perfect_day', icon: 'bigstar', name: 'Flawless Shift', desc: 'Get all 15 stars in one day.' },
+  { id: 'day5', icon: 'calendar:5', name: 'Work Week', desc: 'Reach day 5.' },
+  { id: 'day10', icon: 'calendar:10', name: 'Double Digits', desc: 'Reach day 10.' },
+  { id: 'day25', icon: 'medal:25', name: 'Clinic Legend', desc: 'Reach day 25.' },
+  { id: 'day50', icon: 'elder', name: 'Retirement Is a Myth', desc: 'Reach day 50.' },
+  { id: 'money1k', icon: 'cash', name: 'Four Figures', desc: 'Have $1,000 in the bank.' },
+  { id: 'money5k', icon: 'moneybag', name: 'Doctor Moneybags', desc: 'Have $5,000 in the bank.' },
+  { id: 'money20k', icon: 'bank', name: 'Basically a Bank', desc: 'Have $20,000 in the bank.' },
+  { id: 'patients25', icon: 'people', name: 'Full Waiting Room', desc: 'Treat 25 patients.' },
+  { id: 'patients100', icon: 'hospital', name: 'Hundred Club', desc: 'Treat 100 patients.' },
+  { id: 'tips10', icon: 'jar', name: 'Tip Jar', desc: 'Get 10 tips from happy patients.' },
+  { id: 'first_lawsuit', icon: 'scales', name: 'Lawyered', desc: 'Get sued for the first time.' },
+  { id: 'lawsuits10', icon: 'scroll', name: 'Frequent Defendant', desc: 'Get sued 10 times. The judge knows your name now.' },
+  { id: 'mega_lawsuit', icon: 'boom', name: 'Objection!', desc: 'Get hit with a MEGA lawsuit.' },
+  { id: 'bankrupt', icon: 'can', name: 'Replaced by a Vending Machine', desc: 'Go bankrupt.' },
+  { id: 'caught_runner', icon: 'runner', name: 'Hallway Monitor', desc: 'Catch a runaway patient.' },
+  { id: 'caught_scooter', icon: 'wheelchair', name: 'Wheelchair Grand Prix', desc: 'Catch the scooter thief.' },
+  { id: 'germ_king', icon: 'crown', name: 'Royal Pain', desc: 'Defeat the King Germ.' },
+  { id: 'triplets_first', icon: 'twins', name: 'Triplet Detector', desc: 'Pick the sick triplet on the first try.' },
+  { id: 'lights_found', icon: 'flashlight', name: 'Night Vision', desc: 'Find the kid in the dark.' },
+  { id: 'hider_found', icon: 'peek', name: 'Hide and Seek Champion', desc: 'Find a hiding patient.' },
+  { id: 'baby_calm', icon: 'baby', name: 'Baby Whisperer', desc: 'Give a baby their shot.' },
+  { id: 'all_specials', icon: 'tent', name: 'Seen It All', desc: 'Meet every kind of special patient.' },
+  { id: 'maxed', icon: 'wrench', name: 'Fully Loaded', desc: 'Max out every upgrade.' },
+  { id: 'fashion', icon: 'coat', name: 'Fashion Doctor', desc: 'Change your coat color.' },
+  { id: 'kicked', icon: 'foot', name: 'Face, Meet Foot', desc: 'Get kicked in the face during a reflex test.' },
+  { id: 'hammer_time', icon: 'reflex', name: 'Hammer Time', desc: 'Bonk the wrong spot 3 times in a row.' },
+  { id: 'wrong_tools', icon: 'screwdriver', name: 'Is This a Scalpel?', desc: 'Pick the wrong tool 5 times on one patient.' },
+  { id: 'zero_day', icon: 'melt', name: 'Zero Stars, Full Heart', desc: 'Finish a whole day with zero stars.' },
+  { id: 'in_debt', icon: 'chartDown', name: 'Negative Vibes', desc: 'Have less than $0 in the bank.' },
+  { id: 'vampire_blood', icon: 'vampire', name: 'Blood Bank', desc: 'Take blood from a vampire. He is not thrilled.' },
+  { id: 'escaped', icon: 'wind', name: 'They Went That Way', desc: 'Let a patient escape.' },
+  { id: 'all_tools', icon: 'sparkle', name: 'Tool Collector', desc: 'Use every single tool in the tray at least once.' },
+  { id: 'xray_perfect', icon: 'xray', name: 'Say Cheese', desc: 'Take a perfect X-ray on the first try.' },
+  { id: 'code1', icon: 'lock', name: 'Code Breaker', desc: 'Enter a secret code.' },
+  { id: 'code_all', icon: 'detective', name: 'Master Hacker', desc: 'Enter every secret code.' },
+  { id: 'night_owl', icon: 'owl', name: 'Night Shift (Literally)', desc: 'Play between midnight and 4 AM.', secret: true },
+  { id: 'konami', icon: 'joystick', name: 'Old School', desc: 'Enter a very old cheat code on the title screen.', secret: true },
+  { id: 'tacos', icon: 'taco', name: 'Taco Tuesday', desc: 'Make it rain tacos.', secret: true },
+  { id: 'roach', icon: 'roach', name: 'Health Code Violation', desc: 'Find the roach.', secret: true },
+  { id: 'linus', icon: 'bulb', name: 'The Boss', desc: "Say the designer's name.", secret: true },
+  { id: 'fine_print', icon: 'magnifier', name: 'Fine Print', desc: 'Find the hidden tagline.', secret: true },
+  { id: 'secret_song', icon: 'note', name: 'Secret Song', desc: 'Find the secret song.', secret: true },
+  { id: 'poke_demo', icon: 'point', name: 'Stop Poking Me', desc: 'Poke the patient on the title screen. A lot.', secret: true },
+  { id: 'dev_mode', icon: 'laptop', name: 'Not a Developer', desc: 'Try to unlock developer mode.', secret: true },
+  { id: 'waiting', icon: 'sleepFace', name: 'Waiting Room Champion', desc: 'Sit on the title screen for 3 whole minutes.', secret: true },
+  { id: 'clock', icon: 'alarm', name: 'Time Traveler', desc: 'Mess with the clock.', secret: true },
+  { id: 'plant', icon: 'plant', name: 'Plant Whisperer', desc: 'Give the plant some attention.', secret: true },
+  { id: 'nurse_poke', icon: 'speech', name: 'Nurse Pat Knows Things', desc: 'Bother Nurse Pat until she tells you something.', secret: true },
+  { id: 'sound_toggle', icon: 'soundOff', name: 'Sound of Silence', desc: 'Turn the sound off and on 10 times in a row.', secret: true },
+  { id: 'coffee', icon: 'coffee', name: 'Coffee Break', desc: 'Leave a patient waiting for 2 minutes. They grew a beard.', secret: true },
+  { id: 'ach20', icon: 'trophy', name: 'Achievement Hunter', desc: 'Unlock 20 achievements.' },
+  { id: 'ach_all', icon: 'sprout', name: 'Touch Grass', desc: 'Unlock every other achievement. Then go outside.' },
 ];
 const ACH = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
 export const unlockedCount = () => ACHIEVEMENTS.filter(a => profile.ach[a.id]).length;
@@ -145,7 +149,7 @@ function showToast(a) {
     const t = toastQ.shift();
     if (!t) { toasting = false; return; }
     toasting = true;
-    const el = h('div', 'toast', `<div class="toast-icon">${t.icon}</div><div><small>Achievement unlocked!</small><b>${esc(t.name)}</b></div>`);
+    const el = h('div', 'toast', `<div class="toast-icon">${icon(t.icon)}</div><div><small>Achievement unlocked!</small><b>${esc(t.name)}</b></div>`);
     toasts.appendChild(el);
     try { sfx.coin(); } catch (e) { /* ignore */ }
     setTimeout(() => el.classList.add('out'), 3000);
@@ -192,6 +196,11 @@ export function checkState(state) {
   const hr = new Date().getHours();
   if (hr >= 0 && hr < 4) unlock('night_owl');
 }
+export function usedTool(id, all) {
+  const used = typeof profile.counters.toolsUsed === 'object' ? profile.counters.toolsUsed : {};
+  if (!used[id]) { used[id] = 1; profile.counters.toolsUsed = used; saveProfile(); }
+  if (all.every(t => used[t])) unlock('all_tools');
+}
 export function metSpecial(type) {
   const met = typeof profile.counters.specialsMet === 'object' ? profile.counters.specialsMet : {};
   met[type] = 1; profile.counters.specialsMet = met; saveProfile();
@@ -199,7 +208,7 @@ export function metSpecial(type) {
 
 export function openAchievements() {
   return panel(card => {
-    card.appendChild(h('div', 'card-icon', '🏆'));
+    card.appendChild(h('div', 'card-icon', icon('trophy')));
     card.appendChild(h('div', 'card-title', 'Achievements'));
     card.appendChild(h('div', 'ach-count', `${unlockedCount()} of ${ACHIEVEMENTS.length} unlocked`));
     const list = h('div', 'ach-list');
@@ -207,7 +216,7 @@ export function openAchievements() {
       const got = !!profile.ach[a.id];
       const hidden = a.secret && !got;
       const row = h('div', 'ach' + (got ? ' got' : ''));
-      row.innerHTML = `<div class="ach-icon">${hidden ? '❔' : a.icon}</div><div class="ach-info"><b>${hidden ? 'Secret achievement' : esc(a.name)}</b><span>${hidden ? 'Keep poking around. Seriously, poke things.' : esc(a.desc)}</span></div>`;
+      row.innerHTML = `<div class="ach-icon">${icon(hidden ? 'lock' : a.icon)}</div><div class="ach-info"><b>${hidden ? 'Secret achievement' : esc(a.name)}</b><span>${hidden ? 'Keep poking around. Seriously, poke things.' : esc(a.desc)}</span></div>`;
       list.appendChild(row);
     }
     card.appendChild(list);
@@ -224,6 +233,7 @@ export const CODES = {
   SQUEAKY: { name: 'Squeaky Voices', desc: 'Everyone sounds like they swallowed a balloon.', cheat: 'squeaky' },
   ZOOMIES: { name: 'Zoomies', desc: 'Patients walk in really, really fast.', cheat: 'zoomies' },
   GHOST: { name: 'Spooky Clinic', desc: 'The lights are dim and purple now. Nurse Pat does not like it.', cheat: 'spooky' },
+  BRAVE: { name: 'Brave Patient', desc: 'A sheet of Brave Patient stickers and <b>$100</b> for the sticker fund.', money: 100 },
 };
 export const CHEAT_NAMES = { bighead: 'Big Head Mode', party: 'Party Mode', squeaky: 'Squeaky Voices', zoomies: 'Zoomies', spooky: 'Spooky Clinic' };
 
@@ -263,13 +273,13 @@ export async function goFullscreen() {
   }
   if (isIOS()) {
     return message({
-      icon: '📱', title: 'Full screen on iPhone',
+      icon: icon('phone'), title: 'Full screen on iPhone',
       html: `<p>iPhones don't let websites go full screen, but there's a trick:</p>
-        <ol class="steps"><li>Tap the <b>Share</b> button <span class="kbd">⬆︎</span> in Safari.</li><li>Tap <b>Add to Home Screen</b>.</li><li>Open <b>Doctor Chaos</b> from your home screen.</li></ol>
+        <ol class="steps"><li>Tap the <b>Share</b> button <span class="kbd">${icon('share', 'in')}</span> in Safari.</li><li>Tap <b>Add to Home Screen</b>.</li><li>Open <b>Doctor Chaos</b> from your home screen.</li></ol>
         <p>It opens with no browser bars at all. Your progress comes with you if you have an account.</p>`,
     });
   }
-  return message({ icon: '⛶', title: 'No full screen here', html: '<p>This browser does not allow full screen. Try Chrome, or turn your phone sideways and scroll the page up a little to hide the address bar.</p>' });
+  return message({ icon: icon('fullscreen'), title: 'No full screen here', html: '<p>This browser does not allow full screen. Try Chrome, or turn your phone sideways and scroll the page up a little to hide the address bar.</p>' });
 }
 
 // ---------------- accounts & cloud ----------------
@@ -295,6 +305,21 @@ function setAuth(a) {
   if (hooks.onAuth) hooks.onAuth(auth);
 }
 export const loggedIn = () => !!auth.token;
+// The account named exactly "Creater" gets a guide to every secret (the server checks too).
+export const isCreator = () => !!auth.token && auth.username === 'Creater';
+export function openGuide() {
+  return panel(async card => {
+    card.appendChild(h('div', 'card-icon', icon('book')));
+    card.appendChild(h('div', 'card-title', 'The Secret Guide'));
+    const body = h('div', 'guide', '<div class="lb-msg">Unlocking the vault…</div>');
+    card.appendChild(body);
+    const r = await api('/guide', { authed: true });
+    if (!r.ok) { body.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; }
+    body.innerHTML = '<p class="muted">For the creator only. Tap a secret to reveal how to find it.</p>' + r.guide.map(sec => `<h3>${esc(sec.title)}</h3>` + sec.items.map(([name, how]) => {
+      return `<details class="g-item"><summary>${esc(name)}</summary><p>${esc(how)}</p></details>`;
+    }).join('')).join('');
+  }, { cls: 'guide-panel' });
+}
 
 function cloudBlob() {
   const state = hooks.getState ? hooks.getState() : null;
@@ -310,7 +335,7 @@ export async function syncNow() {
   if (!auth.token || !hooks.getState) return;
   const st = hooks.getState();
   if (!st) return;
-  await api('/progress', { method: 'PUT', authed: true, body: { save: cloudBlob(), money: Math.round(st.money), days: counter('days') } });
+  await api('/progress', { method: 'PUT', authed: true, body: { save: cloudBlob(), money: Math.round(st.money), days: counter('days'), earned: Math.round(counter('earned')) } });
 }
 function mergeProfile(p) {
   if (!p) return;
@@ -334,7 +359,7 @@ async function reconcile(me) {
   }
   if (cloud && local) {
     const v = await message({
-      icon: '☁️', title: 'Which progress?',
+      icon: icon('cloud'), title: 'Which progress?',
       html: `<p>Your account has a different save than this device.</p>
         <div class="pick-save"><div><b>Account</b><span>Day ${cloud.day} · ${fmt(cloud.money)}</span></div><div><b>This device</b><span>Day ${local.day} · ${fmt(local.money)}</span></div></div>`,
       buttons: [{ label: 'Use account save', value: 'cloud', cls: 'primary' }, { label: 'Keep this device', value: 'local' }],
@@ -348,19 +373,20 @@ export function openAccount() {
   return panel((card, close) => {
     const render = () => {
       card.querySelectorAll(':scope > :not(.panel-x)').forEach(n => n.remove());
-      card.appendChild(h('div', 'card-icon', '👤'));
+      card.appendChild(h('div', 'card-icon', icon('user')));
       if (auth.token) {
         card.appendChild(h('div', 'card-title', esc(auth.username)));
         const st = hooks.getState ? hooks.getState() : {};
-        card.appendChild(h('div', 'card-body', `<div class="acct-stats"><div><b>${fmt(st.money || 0)}</b><span>bank</span></div><div><b>${counter('days')}</b><span>days played</span></div><div><b>${unlockedCount()}</b><span>achievements</span></div></div><p class="muted">Your progress saves to your account after every patient, so you can play on any device.</p>`));
+        card.appendChild(h('div', 'card-body', `<div class="acct-stats"><div><b>${fmt(counter('earned'))}</b><span>earned</span></div><div><b>${fmt(st.money || 0)}</b><span>bank</span></div><div><b>${counter('days')}</b><span>days</span></div><div><b>${unlockedCount()}</b><span>awards</span></div></div><p class="muted">Your progress saves to your account after every patient, so you can play on any device.</p>`));
         const row = h('div', 'card-buttons');
-        const lb = h('button', 'btn primary', '📊 Leaderboards'); lb.onclick = () => { sfx.click(); close(null); openLeaderboard(); };
+        const lb = h('button', 'btn primary', 'Leaderboards'); lb.onclick = () => { sfx.click(); close(null); openLeaderboard(); };
         const out = h('button', 'btn', 'Log out'); out.onclick = async () => { sfx.click(); await syncNow(); api('/logout', { method: 'POST', authed: true }); setAuth(null); render(); };
         row.append(lb, out);
+        if (isCreator()) { const g = h('button', 'btn', icon('book', 'in') + ' Secret guide'); g.onclick = () => { sfx.click(); close(null); openGuide(); }; row.prepend(g); }
         card.appendChild(row);
         const del = h('button', 'link-btn danger', 'Delete my account');
         del.onclick = async () => {
-          const ok = await message({ icon: '🗑️', title: 'Delete account?', html: `<p>This removes <b>${esc(auth.username)}</b> from the leaderboards and deletes the cloud save. The game on this device keeps its progress.</p>`, buttons: [{ label: 'Cancel', value: false }, { label: 'Delete it', value: true, cls: 'danger' }] });
+          const ok = await message({ icon: icon('trash'), title: 'Delete account?', html: `<p>This removes <b>${esc(auth.username)}</b> from the leaderboards and deletes the cloud save. The game on this device keeps its progress.</p>`, buttons: [{ label: 'Cancel', value: false }, { label: 'Delete it', value: true, cls: 'danger' }] });
           if (!ok) return openAccount();
           const r = await api('/me', { method: 'DELETE', authed: true });
           if (r.ok) setAuth(null);
@@ -416,35 +442,35 @@ export function openAccount() {
 
 export function openLeaderboard() {
   return panel(card => {
-    card.appendChild(h('div', 'card-icon', '📊'));
+    card.appendChild(h('div', 'card-icon', icon('chart')));
     card.appendChild(h('div', 'card-title', 'Leaderboards'));
     const tabs = h('div', 'tabs');
-    const tM = h('button', 'tab on', '💰 Most money'), tD = h('button', 'tab', '📅 Most days');
+    const tM = h('button', 'tab on', 'Most money earned'), tD = h('button', 'tab', 'Most days played');
     tabs.append(tM, tD); card.appendChild(tabs);
     const box = h('div', 'lb-box'); card.appendChild(box);
     const foot = h('div', 'lb-foot'); card.appendChild(foot);
     const show = async by => {
-      tM.classList.toggle('on', by === 'money'); tD.classList.toggle('on', by === 'days');
+      tM.classList.toggle('on', by === 'earned'); tD.classList.toggle('on', by === 'days');
       box.innerHTML = '<div class="lb-msg">Loading…</div>';
       if (auth.token) await syncNow();
       const r = await api('/leaderboard?by=' + by, { authed: true });
       if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; }
       if (!r.top.length) { box.innerHTML = '<div class="lb-msg">Nobody here yet. Be the first!</div>'; }
       else {
-        const rows = r.top.map((x, i) => `<tr class="${auth.username && x.username.toLowerCase() === auth.username.toLowerCase() ? 'me' : ''}"><td class="rk">${['🥇', '🥈', '🥉'][i] || i + 1}</td><td class="nm">${esc(x.username)}</td><td class="vl">${by === 'money' ? fmt(x.value) : x.value + (x.value === 1 ? ' day' : ' days')}</td></tr>`).join('');
+        const rows = r.top.map((x, i) => `<tr class="${auth.username && x.username.toLowerCase() === auth.username.toLowerCase() ? 'me' : ''}"><td class="rk">${i < 3 ? icon('medal:' + (i + 1), 'rank') : i + 1}</td><td class="nm">${esc(x.username)}</td><td class="vl">${by === 'days' ? x.value + (x.value === 1 ? ' day' : ' days') : fmt(x.value)}</td></tr>`).join('');
         box.innerHTML = `<table class="lb">${rows}</table>`;
       }
-      if (r.me) foot.innerHTML = `You're <b>#${r.me.rank}</b> with <b>${by === 'money' ? fmt(r.me.value) : r.me.value + ' days'}</b>.`;
+      if (r.me) foot.innerHTML = `You're <b>#${r.me.rank}</b> with <b>${by === 'days' ? r.me.value + ' days' : fmt(r.me.value)}</b>.`;
       else foot.innerHTML = '';
     };
-    tM.onclick = () => { sfx.click(); show('money'); };
+    tM.onclick = () => { sfx.click(); show('earned'); };
     tD.onclick = () => { sfx.click(); show('days'); };
     if (!auth.token) {
       const join = h('button', 'btn small primary', 'Make an account to join');
       join.onclick = () => { sfx.click(); openAccount(); };
       const wrap = h('div', 'card-buttons'); wrap.appendChild(join); card.appendChild(wrap);
     }
-    show('money');
+    show('earned');
   }, { cls: 'lb-panel' });
 }
 
@@ -452,7 +478,7 @@ export function openLeaderboard() {
 export function openSettings() {
   let devTaps = 0;
   return panel(card => {
-    card.appendChild(h('div', 'card-icon', '⚙️'));
+    card.appendChild(h('div', 'card-icon', icon('gear')));
     card.appendChild(h('div', 'card-title', 'Settings'));
     const list = h('div', 'set-list'); card.appendChild(list);
     const row = (label, ctrl) => { const r = h('div', 'set-row'); r.appendChild(h('span', 'set-label', label)); r.appendChild(ctrl); list.appendChild(r); return r; };
@@ -477,15 +503,15 @@ export function openSettings() {
       b.onclick = () => { sfx.click(); set(!get()); b.classList.toggle('on', !!get()); b.setAttribute('aria-checked', String(!!get())); };
       return b;
     };
-    row('🔊 Sound effects', slider('sfx'));
-    row('🎵 Music', slider('music'));
-    row('💬 Talking speed', seg('talk', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]));
-    row('✨ Graphics', seg('quality', [['auto', 'Pretty'], ['fast', 'Fast']]));
-    row('📳 Screen shake', toggle(() => settings.shake, v => { settings.shake = v; saveSettings(); applySettings(); }));
-    row('🔠 Bigger text', toggle(() => settings.bigText, v => { settings.bigText = v; saveSettings(); applySettings(); }));
+    row(icon('soundOn', 'in') + ' Sound effects', slider('sfx'));
+    row(icon('note', 'in') + ' Music', slider('music'));
+    row(icon('speech', 'in') + ' Talking speed', seg('talk', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]));
+    row(icon('palette', 'in') + ' Graphics', seg('quality', [['auto', 'Pretty'], ['fast', 'Fast']]));
+    row(icon('boom', 'in') + ' Screen shake', toggle(() => settings.shake, v => { settings.shake = v; saveSettings(); applySettings(); }));
+    row(icon('magnifier', 'in') + ' Bigger text', toggle(() => settings.bigText, v => { settings.bigText = v; saveSettings(); applySettings(); }));
     const fsb = h('button', 'btn small', isFullscreen() ? 'Exit full screen' : 'Go full screen');
     fsb.onclick = () => { sfx.click(); goFullscreen(); };
-    row('⛶ Full screen', fsb);
+    row(icon('fullscreen', 'in') + ' Full screen', fsb);
     // secret codes
     const codeRow = h('form', 'code-row');
     codeRow.innerHTML = '<input name="c" placeholder="Secret code" maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn small" type="submit">Enter</button>';
@@ -496,7 +522,7 @@ export function openSettings() {
       codeMsg.innerHTML = r.msg; codeMsg.className = 'code-msg ' + (r.ok ? 'ok' : 'no');
       if (r.ok) { sfx.great(); codeRow.c.value = ''; renderCheats(); } else sfx.bad();
     };
-    const cr = row('🔐 Codes', codeRow); cr.classList.add('wide');
+    const cr = row(icon('lock', 'in') + ' Codes', codeRow); cr.classList.add('wide');
     list.appendChild(codeMsg);
     const cheatBox = h('div', 'cheats'); list.appendChild(cheatBox);
     const renderCheats = () => {
@@ -504,7 +530,7 @@ export function openSettings() {
       const avail = Object.entries(CODES).filter(([k, c]) => c.cheat && profile.codes[k]).map(([, c]) => c.cheat);
       for (const ch of avail) {
         const r = h('div', 'set-row');
-        r.appendChild(h('span', 'set-label', '🎉 ' + CHEAT_NAMES[ch]));
+        r.appendChild(h('span', 'set-label', icon('sparkle', 'in') + ' ' + CHEAT_NAMES[ch]));
         r.appendChild(toggle(() => !!settings.cheats[ch], v => { settings.cheats[ch] = v; saveSettings(); applySettings(); }));
         cheatBox.appendChild(r);
       }
@@ -513,12 +539,14 @@ export function openSettings() {
     const btns = h('div', 'card-buttons');
     const tut = h('button', 'btn small', 'Show how-to tips again');
     tut.onclick = () => { sfx.click(); hooks.resetTips && hooks.resetTips(); tut.textContent = 'Done!'; tut.disabled = true; };
-    const acct = h('button', 'btn small', auth.token ? '👤 ' + esc(auth.username) : '👤 Account');
+    const acct = h('button', 'btn small', icon('user', 'in') + ' ' + (auth.token ? esc(auth.username) : 'Account'));
     acct.onclick = () => { sfx.click(); openAccount(); };
-    btns.append(tut, acct); card.appendChild(btns);
+    btns.append(tut, acct);
+    if (isCreator()) { const g = h('button', 'btn small', icon('book', 'in') + ' Secret guide'); g.onclick = () => { sfx.click(); openGuide(); }; btns.appendChild(g); }
+    card.appendChild(btns);
     const erase = h('button', 'link-btn danger', 'Erase everything on this device');
     erase.onclick = async () => {
-      const ok = await message({ icon: '⚠️', title: 'Erase everything?', html: '<p>This wipes your days, money, upgrades, achievements and settings on this device. If you have an account, your cloud save stays.</p>', buttons: [{ label: 'Cancel', value: false }, { label: 'Erase it all', value: true, cls: 'danger' }] });
+      const ok = await message({ icon: icon('warning'), title: 'Erase everything?', html: '<p>This wipes your days, money, upgrades, achievements and settings on this device. If you have an account, your cloud save stays.</p>', buttons: [{ label: 'Cancel', value: false }, { label: 'Erase it all', value: true, cls: 'danger' }] });
       if (!ok) return openSettings();
       try { ['doctor-chaos-save-v1', SET_KEY, PRO_KEY, AUTH_KEY].forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
       location.reload();
@@ -527,7 +555,7 @@ export function openSettings() {
     const ver = h('div', 'version', `Doctor Chaos v${VERSION} · Game design by Linus`);
     ver.onclick = () => {
       devTaps++;
-      if (devTaps === 7) { unlock('dev_mode'); secret('dev', { icon: '🧑‍💻', title: 'Developer mode', html: '<p>Developer mode unlocked!</p><p class="muted">Just kidding. There is no developer mode. Nurse Pat is the developer now. She has already filed three bug reports about you.</p>' }); }
+      if (devTaps === 7) { unlock('dev_mode'); secret('dev', { icon: icon('laptop'), title: 'Developer mode', html: '<p>Developer mode unlocked!</p><p class="muted">Just kidding. There is no developer mode. Nurse Pat is the developer now. She has already filed three bug reports about you.</p>' }); }
     };
     card.appendChild(ver);
   }, { cls: 'set-panel' });
@@ -539,7 +567,7 @@ export async function initMeta(h2) {
   applySettings();
   // a little something for anyone who opens the browser console
   try {
-    console.log('%c🩺 DOCTOR CHAOS', 'font-size:20px;font-weight:bold;color:#ff8a2a');
+    console.log('%cDOCTOR CHAOS', 'font-size:20px;font-weight:bold;color:#ff8a2a');
     console.log('%cPsst. You opened the console. That makes you a hacker. Secret code: HACKER. Nurse Pat is watching.', 'color:#2bb3a3');
   } catch (e) { /* ignore */ }
   if (auth.token) {

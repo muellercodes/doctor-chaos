@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clipboard } from '../props.js';
 import { clamp, rand, pick, toon } from '../engine.js';
 import { h } from '../ui.js';
+import { icon } from '../icons.js';
 
 export async function play(G, P) {
   const { E, ui, sfx } = G;
@@ -10,7 +11,7 @@ export async function play(G, P) {
     'This patient is about to sneeze. A LOT.',
     'A target shows where each sneeze will go. <b>Move your clipboard</b> to cover it before the <b>ACHOO!</b>',
     'Block them all to stay clean. Miss one and... ew.',
-  ], '🤧');
+  ], icon('tissue'));
   const S = E.scope();
   person.setPose('sit');
   await E.wait(0.2);

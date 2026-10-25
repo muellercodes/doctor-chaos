@@ -3,6 +3,7 @@ import { organ, object as makeObject, mask as makeMask, scalpel, OBJECT_NAMES } 
 import { clamp, rand, pick, toon } from '../engine.js';
 import { h } from '../ui.js';
 import { music } from '../audio.js';
+import { icon } from '../icons.js';
 
 const COUNTDOWN = {
   kid: ["Ten... nine... I'm not even sleepy... eight... I'm not... zzz"],
@@ -30,7 +31,7 @@ export async function play(G, P, prm = {}) {
     `Drag the <b>${objName}</b> out of the belly. <b>Don't bump the organs</b>. They're grumpy.`,
     'Stitch it up: <b>click each stitch when the shrinking ring reaches it</b>.',
     'Watch the <b>heart rate</b>. If it gets too high, the patient WAKES UP!',
-  ], '🔪');
+  ], icon('surgery'));
   const S = E.scope();
   music.play('surgery');
   S.defer(() => music.play('clinic'));
@@ -59,7 +60,7 @@ export async function play(G, P, prm = {}) {
 
   // ---- vitals ----
   let bpm = 82, woke = false, asleep = false;
-  const vit = S.dom(h('div', 'vitals', '<span class="heart">❤</span><b>82</b><small>BPM</small>'));
+  const vit = S.dom(h('div', 'vitals', `<span class="heart">${icon('heart')}</span><b>82</b><small>BPM</small>`));
   ui.root.appendChild(vit);
   const bpmEl = vit.querySelector('b'), heartEl = vit.querySelector('.heart');
   let beatAcc = 0;

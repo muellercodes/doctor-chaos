@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { stethoscope } from '../props.js';
+import { stethoscope, holdWith } from '../props.js';
 import { clamp, rand, pick } from '../engine.js';
 import { h } from '../ui.js';
+import { icon } from '../icons.js';
 
 const TICKLE = ['Hehe— HAHA— stop!', 'PFFT! That tickles!', 'Hahahaha NO—', "Hee hee! I can't— HAHA!"];
 
@@ -13,7 +14,7 @@ export async function play(G, P, prm = {}) {
     'Move the stethoscope around the chest. <b>Listen</b>: the heartbeat gets <b>louder</b> (and the ring glows) when you are close.',
     '<b>Press and hold</b> on the loudest spot to lock it in.',
     'Then <b>tap along</b> with the heartbeat (click or press Space) when each beat reaches the line.',
-  ], '🩺');
+  ], icon('steth'));
   const S = E.scope();
   person.setPose('sit');
   await E.wait(0.3);
@@ -24,6 +25,7 @@ export async function play(G, P, prm = {}) {
   await E.frame(center, 0.6 * s, (variant === 'trench' ? 0.62 : 0.48) * s, new THREE.Vector3(0, 0.12, 1), 0.8);
   const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -(chest.z + 0.025 * s));
   const st = stethoscope(); st.scale.setScalar(s * 1.5); S.add(st);
+  holdWith(st, G.coatColor || '#ffffff', [0, 0.035, 0.03], [0.4, 0, 0], 0.8);
   const glow = st.userData.glow;
   const spots = [];
   if (variant === 'trench') {
@@ -106,20 +108,20 @@ export async function play(G, P, prm = {}) {
   if (variant === 'trench') {
     person.wiggle = 2; sfx.whoosh();
     await G.say("OK FINE! We're THREE KIDS in a trench coat! We just wanted the free lollipops!", { key: 'c', hold: 1 });
-    ui.popCenter('🧒🧒🧒', 'good');
+    ui.popCenter('THREE heartbeats?!', 'good');
   }
   // ---- rhythm ----
   ui.hint('<b>Tap along</b> with the heartbeat! Click or press <b>Space</b> when each beat hits the line.');
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   const lane = S.dom(h('div', 'lane'));
-  lane.innerHTML = '<div class="lane-line"></div><div class="lane-label">❤ tap on the beat</div>';
+  lane.innerHTML = `<div class="lane-line"></div><div class="lane-label">${icon('heart', 'in')} tap on the beat</div>`;
   ui.root.appendChild(lane);
   const nBeats = 6;
   const period = 60 / bpm;
   const startAt = E.time + 1.6;
   const notes = [];
   for (let i = 0; i < nBeats; i++) {
-    const el = h('div', 'note', '❤'); lane.appendChild(el);
+    const el = h('div', 'note', icon('heart')); lane.appendChild(el);
     notes.push({ t: startAt + i * period, el, judged: false, played: false });
   }
   let taps = [];

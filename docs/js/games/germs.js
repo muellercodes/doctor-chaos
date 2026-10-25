@@ -1,6 +1,7 @@
 // Germ Blaster: shrink down in the Micro-Sub and blast the patient's cold germs.
 import { clamp, rand, pick } from '../engine.js';
 import { openArcade, roundRect, banner, bubble, pops as makePops } from './arcade.js';
+import { icon, drawIcon } from '../icons.js';
 
 const SHOUTS = ['Noooo!', "We'll be back!", 'I just got here!', 'Not the medicine!', 'Tell my mom I tried!', 'Ow, my everything!', 'This is MY nose now!'];
 const BOSS_TAUNTS = ['I am the KING of this nose!', 'You call that medicine?!', 'I will make them sneeze FOREVER!', 'Kevin! Get him!'];
@@ -11,7 +12,7 @@ export async function play(G, P) {
     `${c.first}'s germs are too strong. Hop in the <b>Micro-Sub</b>, shrink down, and blast them!`,
     'Move with the <b>mouse</b> (or <b>arrow keys / WASD</b>). Your sub fires medicine bubbles by itself.',
     'Dodge the flying <b>snot balls</b>. Beat the <b>King Germ</b> at the end!',
-  ], '🦠');
+  ], icon('germ'));
   const A = openArcade(G, { VH: 540, song: 'chase' });
   const { ctx, sfx } = A;
   const diff = G.diff;
@@ -124,9 +125,10 @@ export async function play(G, P) {
     pp.draw(ctx, dt);
     if (splat > 0) { ctx.globalAlpha = Math.min(0.6, splat * 0.5); ctx.fillStyle = '#8ac926'; for (const [x, y, r] of [[0.3, 0.4, 120], [0.65, 0.3, 90], [0.5, 0.65, 140]]) { ctx.beginPath(); ctx.arc(x * VW, y * VH, r, 0, Math.PI * 2); ctx.fill(); } ctx.globalAlpha = 1; }
     // HUD
-    ctx.fillStyle = 'rgba(29,43,54,0.85)'; roundRect(ctx, 16, 14, 230, 40, 20); ctx.fill();
+    const sl = view.safeL || 0;
+    ctx.fillStyle = 'rgba(29,43,54,0.85)'; roundRect(ctx, 16 + sl, 14, 230, 40, 20); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = '700 18px Fredoka, Arial'; ctx.textAlign = 'left';
-    ctx.fillText(`🦠 Germs zapped: ${killed}`, 30, 40);
+    drawIcon(ctx, 'germ', 40 + sl, 34, 26); ctx.fillText(`Germs zapped: ${killed}`, 58 + sl, 40);
     if (boss) {
       const bw = Math.min(400, VW - 300), bx = (VW - bw) / 2;
       ctx.fillStyle = 'rgba(29,43,54,0.85)'; roundRect(ctx, bx - 10, 16, bw + 20, 30, 15); ctx.fill();
