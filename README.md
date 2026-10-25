@@ -117,4 +117,4 @@ Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appen
 - GitHub Pages serves the `docs/` folder from `main`.
 - Cloudflare Pages: `npm install` then `npm run deploy`. This uploads the site plus the API function. The GitHub Pages copy talks to the API on `doctor-chaos.pages.dev`.
 - First-time database setup: `npx wrangler@4 d1 create doctor-chaos-db`, put the id in `wrangler.toml`, then `npm run db:init`.
-- Database changes for an existing database live in `migrations/` (run each once with `npx wrangler@4 d1 execute doctor-chaos-db --remote --file=migrations/<file>`).
+- Database changes for an existing database live in `migrations/` (run each once with `npx wrangler@4 d1 execute doctor-chaos-db --remote --file=migrations/<file>`). If `--file` fails with an authentication error (it uses a separate import API), run the same SQL with `--command "$(grep -v '^--' migrations/<file>)"` instead. 0002, 0003 and 0004 are applied in production.
