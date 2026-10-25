@@ -502,3 +502,39 @@ svg.ic.in { width: 1.2em; height: 1.2em; vertical-align: -0.25em; }
 .bp-heart.on { animation: bpBeat 0.5s ease-out; }
 @keyframes bpBeat { 0% { opacity: 1; transform: scale(1.35); } 100% { opacity: 0.35; transform: scale(1); } }
 .tray-row { max-width: min(760px, calc(100vw - 30px)); margin: 0 auto; }
+
+/* ---------- v1.5: folding tray and chart ---------- */
+.tray-head { position: relative; display: flex; align-items: center; justify-content: center; padding: 0 30px; }
+.tray-fold { position: absolute; right: -4px; top: -4px; width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--ink); background: #fff; display: grid; place-items: center; padding: 0; cursor: pointer; box-shadow: 0 2px 0 var(--ink); pointer-events: auto; }
+.tray-fold svg.ic { width: 18px; height: 18px; transform: rotate(90deg); transition: transform 0.2s; }
+.tray.min { padding: 6px 10px; cursor: pointer; }
+.tray.min .tray-row { display: none; }
+.tray.min .tray-title { margin-bottom: 0; }
+.tray.min .tray-title::after { content: '  · tap to open'; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--ink2); }
+.tray.min .tray-fold svg.ic { transform: rotate(-90deg); }
+.chart { pointer-events: auto; cursor: pointer; }
+.chart.min { padding: 18px 12px 8px; }
+.chart.min > :not(.chart-clip):not(.chart-title) { display: none; }
+.chart.min .chart-title::after { content: ' (tap)'; color: var(--ink2); font-weight: 600; letter-spacing: 0; }
+/* ---------- admin panel ---------- */
+.admin-search { width: 100%; box-sizing: border-box; font: 600 17px var(--font); border: 3px solid var(--ink); border-radius: 12px; padding: 8px 12px; margin: 6px 0 8px; -webkit-user-select: text; user-select: text; }
+.admin-list { max-height: min(46vh, 380px); overflow: auto; display: flex; flex-direction: column; gap: 6px; padding: 2px; }
+.admin-user { display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; font: 600 16px var(--font); color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 12px; padding: 8px 12px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+.admin-user span { font-size: 13px; color: var(--ink2); font-weight: 600; white-space: nowrap; }
+.admin-user.me { background: #fff6d6; }
+.admin-who { font-size: 18px; margin: 4px 0 8px; }
+.admin-label { font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--teal-d); margin: 8px 0 4px; }
+.admin-money, .admin-ups { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-ups .btn svg.ic { width: 20px; height: 20px; vertical-align: -4px; }
+.admin-sum { margin: 10px 0 2px; font-weight: 700; font-size: 16px; }
+.form-ok { color: var(--teal-d); font-weight: 700; min-height: 1.2em; margin-top: 6px; }
+.gift-list { text-align: left; margin: 6px auto; padding-left: 20px; font-size: 18px; }
+/* ---------- promotions ---------- */
+.promo-rank { font-size: 30px; font-weight: 700; color: var(--teal-d); margin: 2px 0 6px; }
+.perks { text-align: left; margin: 8px auto 0; padding-left: 22px; max-width: 420px; line-height: 1.35; }
+.shop-rank { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: -2px 0 6px; font-size: 17px; }
+.shop-rank svg.ic { width: 24px; height: 24px; }
+.shop-rank span { flex-basis: 100%; font-size: 13px; color: var(--ink2); }
+.day-rank { font-weight: 700; color: var(--teal-d); margin: -4px 0 6px; }
+.day-rank svg.ic { width: 22px; height: 22px; vertical-align: -5px; }
+.pause-card .card-icon { cursor: pointer; }

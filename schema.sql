@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   money INTEGER NOT NULL DEFAULT 0,
   days INTEGER NOT NULL DEFAULT 0,
   earned INTEGER NOT NULL DEFAULT 0,
+  gifted INTEGER NOT NULL DEFAULT 0,
   save TEXT,
   updated_at INTEGER,
   fails INTEGER NOT NULL DEFAULT 0,
@@ -29,3 +30,13 @@ CREATE TABLE IF NOT EXISTS ratelimit (
   count INTEGER NOT NULL,
   reset_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS gifts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  money INTEGER NOT NULL DEFAULT 0,
+  upgrades TEXT,
+  from_name TEXT,
+  created_at INTEGER NOT NULL,
+  claimed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_gifts_user ON gifts(user_id, claimed_at);

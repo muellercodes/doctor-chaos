@@ -89,7 +89,7 @@ export async function play(G, P) {
         }
         if (!s.dead && boss && Math.abs(s.x - boss.x) < 70 && Math.abs(s.y - boss.y) < 55) {
           s.dead = true; boss.hp--; boss.hitT = 0.08; sfx.pop();
-          if (boss.hp <= 0) { bossDone = true; pp.add('KING GERM DEFEATED!', boss.x, boss.y, '#ff8a2a', 30); lastPos = { x: boss.x, y: boss.y }; if (Math.random() < 0.5) lastWords = 'Remember... the code... is SQUEAKY...'; boss = null; state = 'win'; stT = 0; sfx.great(); }
+          if (boss.hp <= 0) { bossDone = true; pp.add('KING GERM DEFEATED!', boss.x, boss.y, '#ff8a2a', 30); lastPos = { x: boss.x, y: boss.y }; if (Math.random() < 0.35) lastWords = 'Remember... the code... is SQUEAKY...'; boss = null; state = 'win'; stT = 0; sfx.great(); }
         }
       }
       // collisions: ship vs snot/germs

@@ -39,13 +39,19 @@ There are also funny regulars: a vampire who needs a blood test, a pirate with a
 
 Mess up badly and you get sued. How much depends on how bad it was. Money buys upgrades between days (steadier hands, a lawyer, running shoes, a lollipop jar, coat colors).
 
-It gets harder every day, the clinic has bills to pay at the end of each day, and stars are tough to earn. Progress saves after every patient, and the pause button has an option to go back to the main menu without losing anything. There are 54 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, talking speed, graphics, screen shake, bigger text, full screen).
+Max out every upgrade and you get promoted: Senior Doctor, Head of the Ward, Chief of Medicine, Hospital Director, then Legend of Medicine. Each rank pays more, opens one more level of every upgrade, and changes the job (more patients with two problems, hospital inspectors, emergencies with a timer, six patients a day, a special patient every day).
+
+Days get a little harder as you go and the clinic has bills to pay at the end of each day. Progress saves after every patient, and the pause button has an option to go back to the main menu without losing anything. There are 64 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, patient voices, talking speed, graphics, screen shake, bigger text, full screen).
+
+Patients talk out loud (the device's own text-to-speech, a steady voice per patient), make faces that match how they feel, and almost never say the same goodbye twice. The music changes with what is going on.
 
 There are also secrets. A lot of them. Some are codes you type into Settings. We are not telling you where they are.
 
 ### Accounts and leaderboards
 
-Players can make an account with just a username and a password (no email, nothing personal). An account gets you on two leaderboards (most money earned in total, most days played) and saves your progress in the cloud so you can switch devices. Usernames go through a bad-word filter.
+Players can make an account with just a username and a password (no email, nothing personal). An account gets you on two leaderboards (most money earned in total, most days played) and saves your progress in the cloud so you can switch devices. Usernames go through a bad-word filter. Each account keeps its own progress: making a second account starts a new game, and progress from playing without an account can be moved into a brand new account once.
+
+One account has an admin panel for sending money and upgrades to players (gifts wait on the server until the player's game picks them up, and gifted money does not count on the money-earned leaderboard).
 
 ### Phones
 
@@ -66,6 +72,9 @@ docs/            the whole site (served as-is)
   js/room.js     the exam room and hiding spots
   js/nav.js      walking paths around the furniture
   js/person.js   patients, nurse, babies
+  js/face.js     sculpted heads, skin, eyes, hair, expressions
+  js/speech.js   patient voices (browser text-to-speech)
+  js/audio.js    sound effects and the music sequencer
   js/props.js    tools, swallowed objects, cartoon organs
   js/data.js     names, patients, jokes, lawsuits, reviews
   js/meta.js     settings, achievements, secret codes, accounts, leaderboards
@@ -93,7 +102,7 @@ schema.sql                   database tables (Cloudflare D1)
 wrangler.toml                Cloudflare config, including the database binding
 ```
 
-Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appendix`, `swallowed`, `reflex`, `steth`, `cast`, `runner`, `baby`, `sneezy`, `hider`, `scooter`, `germs`, `triplets`, `lightsout`) jumps straight to one patient. `index.html?lineup` shows a row of random patients.
+Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appendix`, `swallowed`, `reflex`, `steth`, `cast`, `thermo`, `bp`, `otoscope`, `drops`, `bandage`, `xray`, `runner`, `baby`, `sneezy`, `hider`, `scooter`, `germs`, `triplets`, `lightsout`) jumps straight to one patient. `index.html?lineup` shows a row of random patients (`?lineup=expr` with faces). Test pages stay silent (no voices).
 
 ## Hosting
 

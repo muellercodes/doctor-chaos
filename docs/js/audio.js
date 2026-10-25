@@ -16,7 +16,7 @@ function ensure() {
   master.gain.value = muted ? 0 : 0.8;
   master.connect(ctx.destination);
   musicGain = ctx.createGain();
-  musicGain.gain.value = 0.22 * musicVol;
+  musicGain.gain.value = 0.3 * musicVol;
   musicGain.connect(master);
   sfxBus = ctx.createGain();
   sfxBus.gain.value = sfxVol;
@@ -69,7 +69,7 @@ export const sfx = {
   unlock() { const c = ensure(); if (c && c.state === 'suspended') c.resume(); },
   get muted() { return muted; },
   setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; },
-  setVolumes(sv, mv) { sfxVol = sv; musicVol = mv; if (sfxBus) sfxBus.gain.value = sv; if (musicGain) musicGain.gain.value = 0.22 * mv; },
+  setVolumes(sv, mv) { sfxVol = sv; musicVol = mv; if (sfxBus) sfxBus.gain.value = sv; if (musicGain) musicGain.gain.value = 0.3 * mv; },
   set pitch(v) { pitchMul = v; },
   get pitch() { return pitchMul; },
   blip(p = 1) { tone({ freq: 520 * p, type: 'square', dur: 0.06, vol: 0.05 }); },
@@ -119,37 +119,100 @@ export const sfx = {
 };
 
 // ---------- music ----------
+// A tiny step sequencer: pads, bass, a lead line and drums, all synthesized.
+// Songs change with what is happening (title, clinic, mini-games, chases, surgery) and short stings
+// play for big moments (promotion, lawsuits, end of the day).
+const CH = { maj: [0, 4, 7], min: [0, 3, 7], maj7: [0, 4, 7, 11], m7: [0, 3, 7, 10], dom7: [0, 4, 7, 10], sus: [0, 5, 7] };
+const NOTE = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11 };
+const chord = name => { const m = name.match(/^([A-G][#b]?)(.*)$/); return { root: NOTE[m[1]], type: CH[m[2] || 'maj'] || CH.maj }; };
+const n = s => s.split(' ').map(x => (x === '.' ? null : Number(x)));
 const SONGS = {
-  clinic: { bpm: 92, wave: 'triangle', vol: 0.5, bass: [48, 48, 53, 53, 50, 50, 55, 55], lead: [72, null, 76, 74, 72, null, 69, null, 71, null, 74, 72, 71, null, 67, null, 69, null, 72, 71, 69, null, 65, null, 67, 69, 71, 72, 74, null, null, null] },
-  chase: { bpm: 168, wave: 'square', vol: 0.32, bass: [45, 45, 57, 45, 48, 48, 60, 48, 43, 43, 55, 43, 40, 40, 52, 44], lead: [69, 72, 76, 72, 69, 72, 76, 79, 77, 76, 74, 72, 71, 72, 74, 76, 72, 76, 79, 76, 72, 76, 79, 84, 83, 81, 79, 77, 76, 74, 72, 71] },
-  // the clinic song, but more confident
-  secret: { bpm: 132, wave: 'square', vol: 0.34, bass: [48, 60, 53, 65, 50, 62, 55, 67], lead: [77, 79, 81, 79, 77, null, 74, 76, 76, 77, 79, 77, 76, null, 72, 74, 74, 76, 77, 76, 74, null, 70, 72, 72, 74, 76, 77, 79, 81, 84, null] },
-  surgery: { bpm: 76, wave: 'sine', vol: 0.5, bass: [45, null, 45, null, 41, null, 41, null], lead: [69, null, null, 72, null, null, 71, null, 68, null, null, 71, null, null, 69, null] },
+  title: { bpm: 112, lead: 'square', leadVol: 0.85, chords: ['C', 'G', 'Am', 'F'], bass: 'R..R..5.R..R.O5.',
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.',
+    melody: n('72 . 76 79 . 76 74 72 74 . 71 74 . 79 77 76 72 . 76 79 . 81 79 76 77 . 76 74 72 . . .') },
+  clinic: { bpm: 90, lead: 'triangle', leadVol: 0.75, chords: ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], bass: 'R.......5...R...',
+    kick: 'x.......x.......', snare: '........x.......', hat: '....x.......x...',
+    melody: n('77 . 76 . 72 . . . 76 . 74 . 71 . . . 74 . 72 . 69 . 72 . 71 . 72 . 67 . . .') },
+  focus: { bpm: 104, lead: 'triangle', leadVol: 0.55, chords: ['Am', 'F', 'C', 'G'], bass: 'R.R.R.R.R.R.5.5.',
+    kick: 'x.....x...x.....', snare: '....x.......x...', hat: 'xxxxxxxxxxxxxxxx',
+    melody: n('69 . . 72 . . 76 . 77 . . 76 . . 72 . 72 . . 76 . . 79 . 74 . . 71 . . . .') },
+  surgery: { bpm: 74, lead: 'sine', leadVol: 0.8, chords: ['Dm', 'Bb', 'Gm', 'A'], bass: 'R...R...R...R...',
+    kick: 'x..x....x..x....', snare: '................', hat: '..x...x...x...x.',
+    melody: n('69 . . 72 . . 70 . 67 . . 70 . . 69 . 65 . . 69 . . 67 . 64 . . . 61 . . .') },
+  chase: { bpm: 160, lead: 'square', leadVol: 0.6, chords: ['Em', 'C', 'D', 'B'], bass: 'R.RO.RR.R.RO.R5.',
+    kick: 'x...x...x...x...', snare: '....x.......x..x', hat: 'x.x.x.x.x.x.x.x.',
+    melody: n('76 79 83 79 76 79 83 86 84 83 81 79 76 79 81 83 74 78 81 78 74 78 81 86 83 81 79 78 75 78 79 81') },
+  secret: { bpm: 132, lead: 'square', leadVol: 0.75, chords: ['F', 'C', 'Dm', 'Bb'], bass: 'R.ROR.RO5.5OR.RO',
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.',
+    melody: n('77 79 81 79 77 . 74 76 76 77 79 77 76 . 72 74 74 76 77 76 74 . 70 72 72 74 76 77 79 81 84 .') },
 };
-let musicTimer = null;
-let currentSong = null;
+const STINGS = {
+  promotion: { bpm: 120, notes: [[60, 0, 1], [64, 1, 1], [67, 2, 1], [72, 3, 2], [67, 5, 1], [72, 6, 4], [76, 6, 4], [79, 6, 4]] },
+  win: { bpm: 150, notes: [[72, 0, 1], [76, 1, 1], [79, 2, 1], [84, 3, 3]] },
+  lose: { bpm: 90, notes: [[67, 0, 1], [66, 1, 1], [65, 2, 1], [64, 3, 4], [52, 3, 4]] },
+  dayEnd: { bpm: 110, notes: [[67, 0, 1], [72, 1, 1], [76, 2, 1], [74, 3, 1], [72, 4, 1], [76, 5, 3], [79, 5, 3], [60, 5, 3]] },
+};
+let musicTimer = null, currentSong = null, stepI = 0, nextT = 0, duckOn = false;
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function drum(kind, t) {
+  const d = t - ctx.currentTime;
+  if (kind === 'kick') { tone({ freq: 120, type: 'sine', dur: 0.18, vol: 0.5, slide: 0.35, delay: d, dest: musicGain }); }
+  if (kind === 'snare') {
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.8;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    s.connect(f); f.connect(g); g.connect(musicGain); s.start(t, Math.random()); s.stop(t + 0.16);
+  }
+  if (kind === 'hat') {
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    s.connect(f); f.connect(g); g.connect(musicGain); s.start(t, Math.random()); s.stop(t + 0.06);
+  }
+}
+function schedule(song) {
+  const st = 60 / song.bpm / 4;
+  while (nextT < ctx.currentTime + 0.35) {
+    const pos = stepI % 16, bar = Math.floor(stepI / 16);
+    const cd = chord(song.chords[bar % song.chords.length]);
+    const d = nextT - ctx.currentTime;
+    if (pos === 0) for (const iv of cd.type) { tone({ freq: mtof(60 + cd.root + iv - (cd.root > 6 ? 12 : 0)), type: 'triangle', dur: st * 15, vol: 0.035, attack: 0.12, delay: d, dest: musicGain }); }
+    const b = song.bass[pos];
+    if (b && b !== '.') { const off = b === '5' ? 7 : b === 'O' ? 12 : 0; tone({ freq: mtof(36 + cd.root + off), type: 'triangle', dur: st * 1.8, vol: 0.13, delay: d, dest: musicGain }); }
+    if (pos % 2 === 0) {
+      const m = song.melody[(stepI / 2) % song.melody.length];
+      if (m) tone({ freq: mtof(m), type: song.lead, dur: st * 1.7, vol: 0.05 * song.leadVol, attack: 0.01, delay: d, dest: musicGain });
+    }
+    if (song.kick[pos] === 'x') drum('kick', nextT);
+    if (song.snare[pos] === 'x') drum('snare', nextT);
+    if (song.hat[pos] === 'x') drum('hat', nextT);
+    nextT += st; stepI++;
+  }
+}
+function setMusicLevel() { if (musicGain && ctx) musicGain.gain.setTargetAtTime(0.3 * musicVol * (duckOn ? 0.45 : 1), ctx.currentTime, 0.15); }
 
 export const music = {
+  get current() { return currentSong; },
   play(name) {
     if (currentSong === name) return;
     this.stop();
     const c = ensure(); if (!c) return;
     const song = SONGS[name]; if (!song) return;
-    currentSong = name;
-    const step = 60 / song.bpm / 2;
-    let i = 0;
-    let next = c.currentTime + 0.1;
-    musicTimer = setInterval(() => {
-      if (next < c.currentTime) next = c.currentTime + 0.05;
-      while (next < c.currentTime + 0.3) {
-        const b = song.bass[Math.floor(i / 2) % song.bass.length];
-        if (i % 2 === 0 && b) tone({ freq: mtof(b), type: 'triangle', dur: step * 1.6, vol: 0.16 * song.vol, delay: next - c.currentTime, dest: musicGain });
-        const l = song.lead[i % song.lead.length];
-        if (l) tone({ freq: mtof(l), type: song.wave, dur: step * 0.9, vol: 0.12 * song.vol, delay: next - c.currentTime, dest: musicGain });
-        next += step; i++;
-      }
-    }, 80);
+    currentSong = name; stepI = 0; nextT = c.currentTime + 0.08;
+    musicTimer = setInterval(() => { if (ctx.state === 'running') schedule(song); else nextT = ctx.currentTime + 0.05; }, 60);
   },
   stop() { if (musicTimer) clearInterval(musicTimer); musicTimer = null; currentSong = null; },
+  // a short tune over the top; the song keeps going (quietly) underneath
+  sting(name) {
+    const c = ensure(); if (!c) return;
+    const s = STINGS[name]; if (!s) return;
+    const b = 60 / s.bpm / 2;
+    duckOn = true; setMusicLevel();
+    let end = 0;
+    for (const [m, at, len] of s.notes) {
+      tone({ freq: mtof(m), type: 'square', dur: b * len * 0.95, vol: 0.06, delay: at * b, dest: sfxBus });
+      tone({ freq: mtof(m), type: 'triangle', dur: b * len, vol: 0.08, delay: at * b, dest: sfxBus });
+      end = Math.max(end, (at + len) * b);
+    }
+    setTimeout(() => { duckOn = false; setMusicLevel(); }, end * 1000 + 300);
+  },
+  duck(on) { duckOn = !!on; setMusicLevel(); },
 };

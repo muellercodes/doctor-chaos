@@ -45,8 +45,18 @@ export async function play(G, P) {
   const origin = () => ({ x: view.VW / 2 - 150 * SC, y: 74 });
   const hurtNow = () => { const o = origin(); return { x: o.x + hurtLocal[0] * SC + ox, y: o.y + hurtLocal[1] * SC + oy }; };
   G.dbg = { kind: 'xray', hurt: hurtNow, amp: () => amp, toScreen: (x, y) => ({ x: x * view.scale / view.dpr, y: y * view.scale / view.dpr }), get phase() { return phase; } };
-  let clickReq = false;
-  const onDown = () => { clickReq = true; };
+  let clickReq = false, funny = 0, funnyMsg = 0;
+  // secret: the left elbow has a tiny smile. Tap it three times (it does not use up a try).
+  const elbowNow = () => { const o = origin(); return { x: o.x + sk.elL[0] * SC + ox, y: o.y + sk.elL[1] * SC + oy }; };
+  const onDown = () => {
+    const p = A.pointer(), e = elbowNow();
+    if (phase === 'aim' && p.has && Math.hypot(p.x - e.x, p.y - e.y) < 15) {
+      funny++; sfx.giggle(0, 1.2 + funny * 0.15);
+      if (funny === 3) { funnyMsg = 3.5; if (G.ach) G.ach('funny_bone'); }
+      return;
+    }
+    clickReq = true;
+  };
   E.input.listeners.down.add(onDown);
 
   const res = await A.run((dt, v) => {
@@ -111,6 +121,10 @@ export async function play(G, P) {
       for (const [w, hnd] of [[sk.wrL, sk.haL], [sk.wrR, sk.haR]]) for (let k = -2; k <= 2; k++) bone(w, [hnd[0] + k * 5, hnd[1] + 6], 3);
       bone(sk.hipL, sk.knL, 11); bone(sk.knL, sk.anL, 8); bone(sk.hipR, sk.knR, 11); bone(sk.knR, sk.anR, 8);
       bone(sk.anL, sk.ftL, 6); bone(sk.anR, sk.ftR, 6);
+      // the funny bone is smiling (very small)
+      ctx.shadowBlur = 0; ctx.fillStyle = '#16324f'; ctx.strokeStyle = '#16324f'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(sk.elL[0] - 2, sk.elL[1] - 1.5, 0.9, 0, 7); ctx.arc(sk.elL[0] + 2, sk.elL[1] - 1.5, 0.9, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(sk.elL[0], sk.elL[1], 2.6, 0.3, Math.PI - 0.3); ctx.stroke();
       ctx.restore();
     };
     if (phase === 'result' && result !== 'good' && blurShot) {
@@ -144,6 +158,7 @@ export async function play(G, P) {
     ctx.fillText(state === 'calm' ? 'HOLD STILL... now!' : `${c.first} is wiggling...`, VW / 2, by - 6);
     ctx.textAlign = 'right'; ctx.fillText(`Tries left: ${Math.max(0, 3 - tries)}`, VW - 24, VH - 20);
     if (flash > 0) { ctx.fillStyle = `rgba(255,255,255,${flash})`; ctx.fillRect(0, 0, VW, VH); flash -= dt * 3; }
+    if (funnyMsg > 0) { funnyMsg -= dt; banner(ctx, VW, VH, 'HEHEHE! You found my FUNNYBONE!', '#ffd23f', VH / 2 - 120, 28); }
     if (phase === 'result') {
       if (result === 'good') banner(ctx, VW, VH, `Got it! A crack in the ${SPOTS[spotKey].bone}.`, '#7be495', VH / 2 + 150, 32);
       else banner(ctx, VW, VH, result === 'blur' ? 'Too blurry! They moved.' : 'Missed the hurt spot!', '#ff8b8b', VH / 2 + 150, 34);

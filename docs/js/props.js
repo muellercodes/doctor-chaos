@@ -13,25 +13,43 @@ const S = (r, s = 16) => new THREE.SphereGeometry(r, s, Math.round(s * 0.7));
 const glassMat = () => { const mm = new THREE.MeshStandardMaterial({ color: '#e3f6ff', transparent: true, opacity: 0.45 }); mm.userData.dispose = true; return mm; };
 
 // ---------------- DOCTOR'S HAND ----------------
-// A gloved hand that grips along its local Y axis. The forearm always points toward the
-// bottom right of the view (like your own right arm reaching in), whatever the tool is doing.
-const ARM_DIR = new THREE.Vector3(0.42, -0.58, 0.7).normalize();
-const _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3(), _s = new THREE.Vector3();
-export function gloveHand(coat = '#ffffff') {
+// A gloved hand that grips along its local Y axis. The forearm trails out BEHIND the tool
+// (the way you hold a dart or a pencil), kept mostly flat to the screen and nudged to the right,
+// so it never swings across the spot you are working on or balloons toward the camera.
+const RIGHT = new THREE.Vector3(0.85, -0.2, 0).normalize();
+const _q = new THREE.Quaternion(), _pq = new THREE.Quaternion(), _up = new THREE.Vector3(0, 1, 0), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _d = new THREE.Vector3();
+export function gloveHand(coat = '#ffffff', back = [0, 1, 0]) {
   const g = new THREE.Group();
-  const glove = '#5aa9e6';
-  const fist = m(S(0.026, 18), glove, { roughness: 0.45 }); fist.scale.set(1.15, 1.3, 1.0); g.add(fist);
-  for (let i = 0; i < 4; i++) { const k = m(S(0.0085, 10), glove, { roughness: 0.45 }); k.position.set(0.021, -0.02 + i * 0.0135, 0.014); g.add(k); }
-  const thumb = m(new THREE.CapsuleGeometry(0.0085, 0.022, 4, 8), glove, { roughness: 0.45 }); thumb.position.set(-0.016, 0.026, 0.012); thumb.rotation.set(0.4, 0, 0.5); g.add(thumb);
+  const glove = '#6fb3e0';
+  const gm = { roughness: 0.38, metalness: 0 };
+  const palm = m(new THREE.CapsuleGeometry(0.019, 0.018, 6, 14), glove, gm); palm.scale.set(1.25, 1, 0.8); g.add(palm);
+  // curled fingers wrapped around the grip
+  for (let i = 0; i < 4; i++) {
+    const f = m(new THREE.CapsuleGeometry(0.0072, 0.014, 4, 8), glove, gm);
+    f.position.set(0.018, -0.019 + i * 0.0125, 0.012); f.rotation.set(0, 0.6, Math.PI / 2); g.add(f);
+    const tip = m(S(0.0068, 8), glove, gm); tip.position.set(0.006, -0.019 + i * 0.0125, 0.022); g.add(tip);
+  }
+  const thumb = m(new THREE.CapsuleGeometry(0.0078, 0.02, 4, 8), glove, gm); thumb.position.set(-0.014, 0.022, 0.014); thumb.rotation.set(0.5, 0, 0.6); g.add(thumb);
   const arm = new THREE.Group(); g.add(arm);
-  const wrist = m(C(0.019, 0.022, 0.06, 14), glove, { roughness: 0.45 }); wrist.position.y = 0.04; arm.add(wrist);
-  const cuff = m(new THREE.TorusGeometry(0.023, 0.005, 6, 16), glove, { roughness: 0.45 }); cuff.rotation.x = Math.PI / 2; cuff.position.y = 0.07; arm.add(cuff);
-  const sleeve = m(C(0.034, 0.04, 0.42, 16), coat); sleeve.position.y = 0.28; arm.add(sleeve);
-  const sleeveEnd = m(new THREE.TorusGeometry(0.034, 0.006, 6, 18), coat); sleeveEnd.rotation.x = Math.PI / 2; sleeveEnd.position.y = 0.075; arm.add(sleeveEnd);
+  const wrist = m(C(0.017, 0.02, 0.06, 14), glove, gm); wrist.position.y = 0.04; arm.add(wrist);
+  const cuff = m(C(0.021, 0.021, 0.012, 16), glove, gm); cuff.position.y = 0.068; arm.add(cuff);
+  const sleeve = m(C(0.027, 0.032, 0.42, 16), coat); sleeve.position.y = 0.285; arm.add(sleeve);
+  const sleeveEnd = m(new THREE.TorusGeometry(0.027, 0.005, 6, 18), coat); sleeveEnd.rotation.x = Math.PI / 2; sleeveEnd.position.y = 0.076; arm.add(sleeveEnd);
+  const backV = new THREE.Vector3(...back).normalize();
+  const dir = new THREE.Vector3().copy(RIGHT);
+  let primed = false;
   arm.updateMatrixWorld = function (force) {
-    if (this.parent) {
+    const tool = this.parent && this.parent.parent;
+    if (tool) {
+      // where the back of the tool points, flattened onto the screen plane
+      _d.copy(backV).transformDirection(tool.matrixWorld); _d.z = 0;
+      if (_d.lengthSq() < 0.04) _d.copy(RIGHT); else _d.normalize();
+      if (_d.y < -0.3) _d.y = -0.3; // never hang down across the work area
+      _d.multiplyScalar(0.65).addScaledVector(RIGHT, 0.35);
+      _d.z = 0.22; _d.normalize();
+      if (!primed) { dir.copy(_d); primed = true; } else dir.lerp(_d, 0.2).normalize();
       this.parent.matrixWorld.decompose(_v, _pq, _s);
-      _q.setFromUnitVectors(_up, ARM_DIR);
+      _q.setFromUnitVectors(_up, dir);
       this.quaternion.copy(_pq.invert().multiply(_q));
       this.matrixWorldNeedsUpdate = true;
     }
@@ -40,8 +58,8 @@ export function gloveHand(coat = '#ffffff') {
   g.traverse(o => { o.castShadow = false; });
   return g;
 }
-export function holdWith(tool, coat, pos, rot = [0, 0, 0], scale = 1) {
-  const hnd = gloveHand(coat);
+export function holdWith(tool, coat, pos, rot = [0, 0, 0], scale = 1, back = [0, 1, 0]) {
+  const hnd = gloveHand(coat, back);
   hnd.position.set(...pos); hnd.rotation.set(...rot); hnd.scale.setScalar(scale);
   tool.add(hnd);
   return hnd;

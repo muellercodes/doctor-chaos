@@ -79,10 +79,10 @@ export async function play(G, P, prm = {}) {
   const base = rand(0.35, 0.85) * (Math.random() < 0.5 ? 1 : -1) + Math.PI / 2; // barrel direction angle (mostly upward)
   const ghostMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 }); ghostMat.userData.dispose = true;
   const ghost = new THREE.Group();
-  for (let i = 0; i < 8; i++) { const d = new THREE.Mesh(new THREE.BoxGeometry(0.006 * s * 1.6, 0.016 * s * 1.6, 0.002), ghostMat); d.position.y = (0.012 + i * 0.03) * s * 1.6; ghost.add(d); }
+  for (let i = 0; i < 8; i++) { const d = new THREE.Mesh(new THREE.BoxGeometry(0.006 * s * 1.35, 0.016 * s * 1.35, 0.002), ghostMat); d.position.y = (0.012 + i * 0.03) * s * 1.35; ghost.add(d); }
   ghost.position.copy(target); ghost.position.z += 0.004; ghost.rotation.z = base - Math.PI / 2;
   S.add(ghost);
-  const syr = syringe(prm.liquid || '#7fdbff'); syr.scale.setScalar(s * 1.6); S.add(syr);
+  const syr = syringe(prm.liquid || '#7fdbff'); syr.scale.setScalar(s * 1.35); S.add(syr);
   holdWith(syr, G.coatColor || '#ffffff', [0, 0.16, 0]);
   const amp = 0.75;
   const omega = 1.9 + diff * 1.6;
@@ -106,7 +106,7 @@ export async function play(G, P, prm = {}) {
         ang = base + amp * Math.sin(phaseT * omega); curAng = ang;
         const p = E.pointerOnPlane(plane);
         if (p) { syr.position.set(p.x, p.y, target.z + 0.012); }
-        syr.rotation.set(0.35, 0, ang - Math.PI / 2, 'ZYX');
+        syr.rotation.set(0.18, 0, ang - Math.PI / 2, 'ZYX');
         angM.set(0.5 + (ang - base) / (2 * amp));
         if (pending) { offU(); res(); }
       });
@@ -117,7 +117,7 @@ export async function play(G, P, prm = {}) {
     const angErr = Math.abs(ang - base);
     // poke animation
     const p0 = syr.position.clone();
-    const dirv = new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0.35).normalize();
+    const dirv = new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0.18).normalize();
     await E.tween(0.12, k => syr.position.copy(p0).addScaledVector(dirv, -0.012 * s * k));
     if (posErr > 1.3 || angErr > green) {
       aimMiss++;
@@ -134,7 +134,7 @@ export async function play(G, P, prm = {}) {
     ui.popAt(target, q > 0.75 ? 'PERFECT!' : 'Nice!', 'good');
     // snap to target at ideal angle
     const sp = syr.position.clone(), sa = ang;
-    await E.tween(0.2, k => { syr.position.lerpVectors(sp, target.clone().add(new THREE.Vector3(0, 0, -0.006 * s)), k); syr.rotation.set(0.35, 0, sa + (base - sa) * k - Math.PI / 2, 'ZYX'); });
+    await E.tween(0.2, k => { syr.position.lerpVectors(sp, target.clone().add(new THREE.Vector3(0, 0, -0.006 * s)), k); syr.rotation.set(0.18, 0, sa + (base - sa) * k - Math.PI / 2, 'ZYX'); });
     break;
   }
   angM.remove();
@@ -176,7 +176,7 @@ export async function play(G, P, prm = {}) {
     sfx.ding();
     // retract & bandage
     const sp = syr.position.clone();
-    const dirv = new THREE.Vector3(Math.cos(base), Math.sin(base), 0.35).normalize();
+    const dirv = new THREE.Vector3(Math.cos(base), Math.sin(base), 0.18).normalize();
     await E.tween(0.35, k => syr.position.copy(sp).addScaledVector(dirv, 0.12 * s * k));
     syr.visible = false;
     const band = bandage(G.bandageColor || '#ffcc80'); band.scale.setScalar(s * 1.1);

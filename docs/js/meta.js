@@ -5,7 +5,7 @@ import { h } from './ui.js';
 import { icon } from './icons.js';
 export { icon };
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 
 const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null') || {}; } catch (e) { return {}; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };
@@ -17,7 +17,7 @@ export const hooks = {};
 
 // ---------------- settings ----------------
 const SET_KEY = 'doctor-chaos-settings-v1';
-export const settings = { sfx: 1, music: 1, talk: 'normal', quality: 'auto', shake: true, bigText: false, cheats: {}, ...load(SET_KEY) };
+export const settings = { sfx: 1, music: 1, voices: true, talk: 'normal', quality: 'auto', shake: true, bigText: false, cheats: {}, ...load(SET_KEY) };
 settings.cheats = { ...(settings.cheats || {}) };
 export function saveSettings() { store(SET_KEY, settings); }
 export function applySettings() {
@@ -26,11 +26,43 @@ export function applySettings() {
   if (hooks.applySettings) hooks.applySettings(settings);
 }
 
-// ---------------- profile (kept across "New game") ----------------
+// ---------------- save slots ----------------
+// Every account on this device gets its own save and profile. Playing without an account uses the
+// "guest" slot. Nothing is ever copied from one account to another.
+const AUTH_KEY = 'doctor-chaos-auth-v1';
+export const auth = { token: null, username: null, ...load(AUTH_KEY) };
+export const SAVE_BASE = 'doctor-chaos-save-v1';
 const PRO_KEY = 'doctor-chaos-profile-v1';
-export const profile = { ach: {}, secrets: {}, codes: {}, counters: {}, ...load(PRO_KEY) };
+const slotOf = name => (name ? ':' + String(name).toLowerCase() : '');
+export const slotKey = (base, name = auth.username) => base + slotOf(name);
+export const saveKey = () => slotKey(SAVE_BASE);
+function moveSlot(fromName, toName) {
+  try {
+    for (const base of [SAVE_BASE, PRO_KEY]) {
+      const v = localStorage.getItem(slotKey(base, fromName));
+      if (v != null) { localStorage.setItem(slotKey(base, toName), v); localStorage.removeItem(slotKey(base, fromName)); }
+    }
+  } catch (e) { /* storage blocked */ }
+}
+// One-time move for devices that played before slots existed: the device save belonged to whoever was logged in.
+try {
+  if (!localStorage.getItem('doctor-chaos-slots-v2')) {
+    if (auth.username && localStorage.getItem(slotKey(SAVE_BASE)) == null) moveSlot(null, auth.username);
+    localStorage.setItem('doctor-chaos-slots-v2', '1');
+  }
+} catch (e) { /* ignore */ }
+function guestProgress() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_BASE) || 'null');
+    if (!s || (s.day <= 1 && !s.tutorialDone)) return null;
+    return s;
+  } catch (e) { return null; }
+}
+
+// ---------------- profile (kept across "New game") ----------------
+export const profile = { ach: {}, secrets: {}, codes: {}, counters: {}, ...load(slotKey(PRO_KEY)) };
 for (const k of ['ach', 'secrets', 'codes', 'counters']) profile[k] = { ...(profile[k] || {}) };
-export function saveProfile() { store(PRO_KEY, profile); queueSync(); }
+export function saveProfile() { store(slotKey(PRO_KEY), profile); queueSync(); }
 export function bump(name, n = 1) { profile.counters[name] = (profile.counters[name] || 0) + n; saveProfile(); return profile.counters[name]; }
 export function counter(name) { return profile.counters[name] || 0; }
 
@@ -117,6 +149,10 @@ export const ACHIEVEMENTS = [
   { id: 'escaped', icon: 'wind', name: 'They Went That Way', desc: 'Let a patient escape.' },
   { id: 'all_tools', icon: 'sparkle', name: 'Tool Collector', desc: 'Use every single tool in the tray at least once.' },
   { id: 'xray_perfect', icon: 'xray', name: 'Say Cheese', desc: 'Take a perfect X-ray on the first try.' },
+  { id: 'promoted', icon: 'medal:1', name: 'Moving On Up', desc: 'Get promoted by maxing out every upgrade.' },
+  { id: 'director', icon: 'crown', name: 'Corner Office', desc: 'Become Hospital Director.' },
+  { id: 'legend', icon: 'bigstar', name: 'Legend of Medicine', desc: 'Reach the very top rank.' },
+  { id: 'inspector', icon: 'scroll', name: 'Passed Inspection', desc: 'Get 3 stars while the inspector watches.' },
   { id: 'code1', icon: 'lock', name: 'Code Breaker', desc: 'Enter a secret code.' },
   { id: 'code_all', icon: 'detective', name: 'Master Hacker', desc: 'Enter every secret code.' },
   { id: 'night_owl', icon: 'owl', name: 'Night Shift (Literally)', desc: 'Play between midnight and 4 AM.', secret: true },
@@ -134,6 +170,10 @@ export const ACHIEVEMENTS = [
   { id: 'nurse_poke', icon: 'speech', name: 'Nurse Pat Knows Things', desc: 'Bother Nurse Pat until she tells you something.', secret: true },
   { id: 'sound_toggle', icon: 'soundOff', name: 'Sound of Silence', desc: 'Turn the sound off and on 10 times in a row.', secret: true },
   { id: 'coffee', icon: 'coffee', name: 'Coffee Break', desc: 'Leave a patient waiting for 2 minutes. They grew a beard.', secret: true },
+  { id: 'flatline', icon: 'heart', name: 'Have You Tried Unplugging It?', desc: 'Annoy the heart monitor.', secret: true },
+  { id: 'funny_bone', icon: 'bone', name: 'Funny Bone', desc: 'Find the funny bone. It is not funny. It is a bone.', secret: true },
+  { id: 'cat_day', icon: 'cat', name: 'Lucky Day 13', desc: 'Meet the clinic cat.', secret: true },
+  { id: 'nap', icon: 'sleepFace', name: 'Power Nap', desc: 'Find out what the pause button really does.', secret: true },
   { id: 'ach20', icon: 'trophy', name: 'Achievement Hunter', desc: 'Unlock 20 achievements.' },
   { id: 'ach_all', icon: 'sprout', name: 'Touch Grass', desc: 'Unlock every other achievement. Then go outside.' },
 ];
@@ -224,31 +264,62 @@ export function openAchievements() {
 }
 
 // ---------------- secret codes ----------------
-export const CODES = {
-  PICKLES: { name: 'Pickle Money', desc: 'Dave Pickles left you <b>$500</b> in a jar.', money: 500 },
-  HACKER: { name: 'Leet Cash', desc: '<b>$1,337</b> just appeared in your account. Nobody ask how.', money: 1337 },
-  SNACK: { name: 'Vending Machine Jackpot', desc: 'The courthouse vending machine paid out <b>$250</b> and a bag of pretzels.', money: 250 },
-  BIGHEAD: { name: 'Big Head Mode', desc: 'Every patient now has a very big head. Medically concerning.', cheat: 'bighead' },
-  PARTY: { name: 'Party Mode', desc: 'Everyone gets a party hat. Even during surgery.', cheat: 'party' },
-  SQUEAKY: { name: 'Squeaky Voices', desc: 'Everyone sounds like they swallowed a balloon.', cheat: 'squeaky' },
-  ZOOMIES: { name: 'Zoomies', desc: 'Patients walk in really, really fast.', cheat: 'zoomies' },
-  GHOST: { name: 'Spooky Clinic', desc: 'The lights are dim and purple now. Nurse Pat does not like it.', cheat: 'spooky' },
-  BRAVE: { name: 'Brave Patient', desc: 'A sheet of Brave Patient stickers and <b>$100</b> for the sticker fund.', money: 100 },
-};
-export const CHEAT_NAMES = { bighead: 'Big Head Mode', party: 'Party Mode', squeaky: 'Squeaky Voices', zoomies: 'Zoomies', spooky: 'Spooky Clinic' };
+// Secret codes. The game only keeps a hash of each code word plus a description scrambled with the
+// word itself, so reading the source does not give the codes away.
+const codeHash = w => { let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995; for (const ch of w) { const c = ch.charCodeAt(0); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ c, 0x5bd1e995) >>> 0; b = (b ^ (b >>> 15)) >>> 0; } return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0'); };
+function unscramble(d, w) {
+  try {
+    const bin = atob(d), k = new TextEncoder().encode(w + '#doctorchaos');
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) ^ k[i % k.length];
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (e) { return null; }
+}
+const CODE_TABLE = [
+  { h: '9aab47983e1b0ddd', d: 'K2stKiEgcRlGPwoXBB4GSCwAHTUwYWduITZQB01ZVisTFQ1BPxozIi8uP2U/RgIbQw0AB0NUA1FXZXlzd2MnbQMNAUMVTxgCGk9NX3IkLCUpPHEZUV9TCQ==' },
+  { h: '83558c3fff72fb34', d: 'M2MtKig3AV5NLxEKBkMrABwbam1hLyAhQEZVQUgNTEdZTVxAf31sKXtySREcF1QOAhMNAB0WLGEqJWUrTBEdQxUMEQwdDxtdaA8sKSo2WkQOEB9PGgwfT01faiwsJSArAV5eUEdYDw==' },
+  { h: '184f3bcd8497dd67', d: 'KGwvIiZGRlVBIgocBwEPCFMeLyIrIk0BTykVDBkTBxVNX3EqJDAoAV5NNxwKUgAHFB0HOyE0MC4DEgoNEAYcBEgMDhA7Jy8ma1MFBgdUAAcXSF0NTXd8dHN3DAZRQxUBFkMJQQ0SNG4uJWtTFgoXDgoeEEZDQ1E+IS8mMgFeXVZEEg==' },
+  { h: 'd879727715e8ba3c', d: 'OWspKSgkZhlGLQoTTzoGCQVPPi0tImppYyBGFwxBTk03FQ0TFlMyKDMhIC8wAwoAFFQHExBIAE8FJzs+aCcoIwMMCgIQQVIuDQUGECMlKzFlIitNBwoRGgYcBEZDQ1EhISIpMWN+AQYGBBwKEwdKHA==' },
+  { h: 'f51b2bb7dfc850df', d: 'K2M8NTRGRlVBJA4AFxFBIhw0JHB4e0cBHABWVVAmHgQdCj8vN3Q+RhAcQxVPAgIaFRZTOCAmenlmEgoNVAsHEQEPCFMjNCAzPFEdQUFYTRELDQAbUWpjIjUrVx1NHg==' },
+  { h: '3776664ad327bd74', d: 'KHM7JCwuexlGPBIBChMIEUE5HDoyMDZjZ3tHARwAVlVQJh4EHQo8PzBlMiQsTQAcQxgGGQZIFQcWKnEmMiAnNUwTCgdUDlIBCQ0DHDw/e2dtaTpLAQ4XVlVQEBkUChI4KHc4' },
+  { h: '3702a3ede0ee7329', d: 'IW0hLCQgcRlGNQwbAhsGG0NDUT4qPC5rf3FzBRsKEQEGEEgWDh8xbyYjaTc2QggDGlhPAAYJDQMKeikuPj1rcQ9GDAsRDgZBUkMVHDUiJig6Zy4=' },
+  { h: '19181530f670fba1', d: 'PGohMjlGRlVBJx8dDAMYTzArISE6NwFITQcRHBFBUkM7GyJoIzozSxAcQxUdF0MMCAJTJiYrcyRWFh8PEU8cDB9PTz0yOjw2dHMFG0MQABcQSA8AB2ckJjgxAw0bTVZDUAAABA4HZXJtICRMCwQaVhI=' },
+  { h: 'bb5b46a1c8ab04b5', d: 'OXAvNyhGRlVBNh0TFQ1BPxI2OyQ4MQFITQcRHBFBUkMuUzE6JDMxAwsJQzYdExUNQT8SNjskODEDFxsKFwQXERtBDh0mcn00ewdVX1NIQBBdSAcAAWImKTNlUBAGAB8KAEMOFAEXbHBtdChMCgoaVlVDU1gc' },
+  { h: 'a76274bdeabfe23c', d: 'PmM8Niw9AV5NJhUdBQIQQSwcKS03NDU3UUZDQRAKAQBKW00yZTIxPiQ2QAFPDgEcFxYFQQ0cMCY6I2EhTBEdQxEOABQJGU8QKi0+MiIsSgsBQxIAAENUA1FXcXFia246HUpPJAYAARBGQT0aJil+dyMtV0QIERscAU1KTU0eKi83LmNiF1RfHg==' },
+  { h: '0e69a219eb1d8c9e', d: 'PXcgLzQnbXRnZREBDQ1PMAwGBE1fZDErPTpgdWwcTBEdQxIaHA0RQQ0cKDBuJypiOCE3VwxPXxZRVlBYUVNcJGtuOjZiPC0sRgoMBlpPOxdIDQ4GIT0rKnk2JytlVAwADxFPBgoFBEFRancjITcnNmx/EFRfHg==' },
+  { h: '819cae7daef8aa01', d: 'NmchNk4BTVlWLBMXSCQOAT5nY3VHARwAVlVQJh4EHQptNS4jSgEBF1QHExBIAg4HbSAuJVBEAQwDQVItHRMcFm0VLiMDDRxDFQMeBhoGBhBtMSB3VwwGEFpNXkELCQoSOWd1dUAFGxBWEg==' },
+  { h: 'b6811559106fd3dc', d: 'NWM+NSQoZxlGIQIETz8MBgQWUWJjNDE6LmcZRjYMAU8cAhgRChduLj50PSUgAwcAFhcHUgIGBU8VITQ+MGlxJx1AXVZEU10BVkEGHW41ODFpLjBQDAYMGhxcQURDAhwgJCl2c39wExk=' },
+  { h: '4b880d936271dab2', d: 'L2stKjkqYXEBMAYOEU87EEgsAB0xMGFndismOEBGVUEgBxdDCw0AED9pKyowb38pHUBZU0RTXQFWQRsSJCwnayAgYz9LAU8BFQwZTUg1Bh4xaTEuNSMvMgMNHEMZABwGEU9NX3YkLCUxNmFxFVRfHg==' },
+  { h: 'c476f5c155d46299', d: 'OWcrMS8qbWoBNgABGxtSNQcIDBYxZ2lyJio8MwFeTSIYA1ITCRUGFiwxNnA2LiM7AwgGCBFPAAwKDhsAYisqJ2xvDRVmNEFDNiA9M0ZDQ1EhLSAxNm11clELDQwATQ8=' },
+];
+export const CODE_COUNT = CODE_TABLE.length;
+// older saves stored the code word itself; move those to the hash
+function migrateCodes() {
+  for (const k of Object.keys(profile.codes)) {
+    if (/^[A-Z]+$/.test(k)) {
+      const row = CODE_TABLE.find(r => r.h === codeHash(k)); const info = row && unscramble(row.d, k);
+      delete profile.codes[k];
+      if (info && !profile.codes[row.h]) profile.codes[row.h] = { t: Date.now(), name: info.name, cheat: info.cheat || null };
+    }
+  }
+}
+migrateCodes();
+export const CHEAT_NAMES = { bighead: 'Big Head Mode', party: 'Party Mode', squeaky: 'Squeaky Voices', zoomies: 'Zoomies', spooky: 'Spooky Clinic', cats: 'Cat Ears', robot: 'Robot Voices' };
 
 export function enterCode(raw) {
   const code = String(raw || '').toUpperCase().replace(/[^A-Z]/g, '');
   if (!code) return { ok: false, msg: 'Type a code first.' };
-  const c = CODES[code];
+  const hsh = codeHash(code);
+  const row = CODE_TABLE.find(r => r.h === hsh);
+  const c = row && unscramble(row.d, code);
   if (!c) return { ok: false, msg: pickOne(['Nope. That is not a code.', 'Nurse Pat shakes her head slowly.', 'Wrong. The computer is laughing at you.', 'Not a code. Nice try though.']) };
-  if (profile.codes[code]) return { ok: false, msg: `You already used ${code}. ${c.cheat ? 'Turn it on or off below.' : 'No double-dipping.'}` };
-  profile.codes[code] = Date.now();
+  if (profile.codes[hsh]) return { ok: false, msg: `You already used ${code}. ${c.cheat ? 'Turn it on or off below.' : 'No double-dipping.'}` };
+  profile.codes[hsh] = { t: Date.now(), name: c.name, cheat: c.cheat || null };
   if (c.money && hooks.addMoney) hooks.addMoney(c.money);
   if (c.cheat) { settings.cheats[c.cheat] = true; saveSettings(); applySettings(); }
   saveProfile();
   unlock('code1');
-  if (Object.keys(CODES).every(k => profile.codes[k])) unlock('code_all');
+  if (CODE_TABLE.every(r => profile.codes[r.h])) unlock('code_all');
   return { ok: true, msg: `<b>${c.name}!</b> ${c.desc}` };
 }
 function pickOne(a) { return a[Math.floor(Math.random() * a.length)]; }
@@ -283,8 +354,6 @@ export async function goFullscreen() {
 }
 
 // ---------------- accounts & cloud ----------------
-const AUTH_KEY = 'doctor-chaos-auth-v1';
-export const auth = { token: null, username: null, ...load(AUTH_KEY) };
 const API = location.hostname.endsWith('github.io') ? 'https://doctor-chaos.pages.dev/api' : '/api';
 async function api(path, { method = 'GET', body, authed = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -321,6 +390,102 @@ export function openGuide() {
   }, { cls: 'guide-panel' });
 }
 
+// ---------------- gifts and the admin panel ----------------
+// Gifts wait on the server until the player's game picks them up (at boot, at the start of a day, in the shop).
+let claiming = false;
+export async function claimGifts() {
+  if (!auth.token || claiming || !hooks.applyGift) return;
+  claiming = true;
+  try {
+    const r = await api('/gifts', { method: 'POST', authed: true });
+    if (!r.ok || !r.gifts || !r.gifts.length) return;
+    const lines = [];
+    for (const g of r.gifts) {
+      const res = hooks.applyGift(g) || { names: [] };
+      const bits = [];
+      if (g.money) bits.push(`<b>${fmt(g.money)}</b>`);
+      bits.push(...res.names.map(esc));
+      if (bits.length) lines.push(`<li>${bits.join(', ')}</li>`);
+    }
+    sfx.great();
+    const from = r.gifts[0].from || 'the creator';
+    await message({ icon: icon('gift'), title: `A gift from ${esc(from)}!`, html: `<ul class="gift-list">${lines.join('')}</ul><p class="muted">Gifted money does not count toward the money-earned leaderboard.</p>`, buttons: [{ label: 'Thank you!', value: true, cls: 'primary' }] });
+    queueSync(true);
+  } finally { claiming = false; }
+}
+export const isAdmin = isCreator;
+export function openAdmin() {
+  return panel((card, close) => {
+    let users = [], filter = '', pick = null;
+    const render = () => {
+      card.querySelectorAll(':scope > :not(.panel-x)').forEach(n => n.remove());
+      card.appendChild(h('div', 'card-icon', icon('shield')));
+      card.appendChild(h('div', 'card-title', 'Admin Panel'));
+      if (!pick) {
+        card.appendChild(h('p', 'muted', 'Send money and upgrades to any player, or to yourself. Only the Creater account can open this.'));
+        const search = h('input', 'admin-search'); search.placeholder = 'Find a player'; search.value = filter;
+        search.oninput = () => { filter = search.value; drawList(); };
+        card.appendChild(search);
+        const box = h('div', 'admin-list'); card.appendChild(box);
+        const drawList = () => {
+          if (!users.length) { box.innerHTML = '<div class="lb-msg">Loading players…</div>'; return; }
+          const me = users.find(u => u.username === auth.username);
+          const rest = users.filter(u => u !== me && u.username.toLowerCase().includes(filter.toLowerCase()));
+          box.innerHTML = '';
+          for (const u of (me && (!filter || me.username.toLowerCase().includes(filter.toLowerCase())) ? [me, ...rest] : rest)) {
+            const b = h('button', 'admin-user' + (u === me ? ' me' : ''), `<b>${esc(u.username)}${u === me ? ' (you)' : ''}</b><span>Day ${u.days || 0} · ${fmt(u.earned || 0)} earned</span>`);
+            b.onclick = () => { sfx.click(); pick = u; render(); };
+            box.appendChild(b);
+          }
+          if (!box.children.length) box.innerHTML = '<div class="lb-msg">Nobody by that name.</div>';
+        };
+        drawList();
+        if (!users.length) api('/admin/users', { authed: true }).then(r => { if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; } users = r.users || []; drawList(); });
+        return;
+      }
+      // one player
+      const gift = { money: 0, upgrades: {} };
+      card.appendChild(h('div', 'admin-who', `To: <b>${esc(pick.username)}</b>${pick.username === auth.username ? ' (you)' : ''}`));
+      const sum = h('div', 'admin-sum');
+      const drawSum = () => {
+        const ups = gift.upgrades === 'max' ? ['every upgrade maxed'] : Object.entries(gift.upgrades).map(([id, n]) => `${(hooks.upgradeList ? hooks.upgradeList() : []).find(u => u.id === id)?.name || id} +${n}`);
+        sum.innerHTML = gift.money || ups.length ? `Sending: ${[gift.money ? fmt(gift.money) : '', ...ups].filter(Boolean).join(', ')}` : '<span class="muted">Pick some money or upgrades.</span>';
+      };
+      const money = h('div', 'admin-money');
+      for (const n of [100, 500, 1000, 5000, 10000]) { const b = h('button', 'btn small', '+' + fmt(n)); b.onclick = () => { sfx.coin(); gift.money = Math.min(1000000, gift.money + n); drawSum(); }; money.appendChild(b); }
+      const clr = h('button', 'btn small', 'Clear'); clr.onclick = () => { sfx.click(); gift.money = 0; gift.upgrades = {}; drawSum(); }; money.appendChild(clr);
+      card.appendChild(h('div', 'admin-label', 'Money')); card.appendChild(money);
+      const ups = h('div', 'admin-ups');
+      for (const u of (hooks.upgradeList ? hooks.upgradeList() : [])) {
+        const b = h('button', 'btn small', `${icon(u.icon, 'in')} ${esc(u.name)} +1`);
+        b.onclick = () => { sfx.click(); if (gift.upgrades === 'max') gift.upgrades = {}; gift.upgrades[u.id] = Math.min(10, (gift.upgrades[u.id] || 0) + 1); drawSum(); };
+        ups.appendChild(b);
+      }
+      const mx = h('button', 'btn small', icon('sparkle', 'in') + ' Max everything'); mx.onclick = () => { sfx.click(); gift.upgrades = 'max'; drawSum(); }; ups.appendChild(mx);
+      card.appendChild(h('div', 'admin-label', 'Upgrades')); card.appendChild(ups);
+      card.appendChild(sum); drawSum();
+      const msg = h('div', 'form-err'); card.appendChild(msg);
+      const row = h('div', 'card-buttons');
+      const back = h('button', 'btn', 'Back'); back.onclick = () => { sfx.click(); pick = null; render(); };
+      const send = h('button', 'btn primary', icon('gift', 'in') + ' Send gift');
+      send.onclick = async () => {
+        const hasUp = gift.upgrades === 'max' || Object.keys(gift.upgrades).length;
+        if (!gift.money && !hasUp) { msg.textContent = 'Pick some money or an upgrade first.'; sfx.bad(); return; }
+        send.disabled = true; send.textContent = 'Sending…';
+        const r = await api('/admin/gift', { method: 'POST', authed: true, body: { to: pick.username, money: gift.money, upgrades: hasUp ? gift.upgrades : null } });
+        send.disabled = false; send.innerHTML = icon('gift', 'in') + ' Send gift';
+        if (!r.ok) { msg.textContent = r.error; sfx.bad(); return; }
+        sfx.great();
+        msg.className = 'form-ok'; msg.textContent = pick.username === auth.username ? 'Sent! Opening it now…' : `Sent! ${pick.username} gets it next time they play.`;
+        gift.money = 0; gift.upgrades = {}; drawSum();
+        if (pick.username === auth.username) { close(null); await claimGifts(); }
+      };
+      row.append(back, send); card.appendChild(row);
+    };
+    render();
+  }, { cls: 'admin-panel' });
+}
+
 function cloudBlob() {
   const state = hooks.getState ? hooks.getState() : null;
   return { state, profile: { ach: profile.ach, secrets: profile.secrets, codes: profile.codes, counters: profile.counters } };
@@ -344,29 +509,22 @@ function mergeProfile(p) {
     if (typeof v === 'number') profile.counters[id] = Math.max(profile.counters[id] || 0, v);
     else if (v && typeof v === 'object') profile.counters[id] = { ...(typeof profile.counters[id] === 'object' ? profile.counters[id] : {}), ...v };
   }
-  store(PRO_KEY, profile);
+  migrateCodes();
+  store(slotKey(PRO_KEY), profile);
 }
-// After logging in: bring the account's save onto this device, or push this device's save up.
-async function reconcile(me) {
-  const local = hooks.getState ? hooks.getState() : null;
-  const cloud = me.save && me.save.state;
-  mergeProfile(me.save && me.save.profile);
-  const localFresh = !local || (local.day <= 1 && !local.tutorialDone && Math.round(local.money) === 200);
-  if (cloud && (localFresh || (cloud.day === local.day && Math.round(cloud.money) === Math.round(local.money)))) {
-    if (!localFresh) return syncNow();
-    hooks.loadState && hooks.loadState(cloud);
-    return;
-  }
-  if (cloud && local) {
+// Switch to another save slot. The page reloads so nothing from the old slot stays in memory.
+async function switchTo(newAuth, { offerGuest = false, cloudEmpty = true } = {}) {
+  const g = offerGuest && cloudEmpty ? guestProgress() : null;
+  setAuth(newAuth);
+  if (g) {
     const v = await message({
-      icon: icon('cloud'), title: 'Which progress?',
-      html: `<p>Your account has a different save than this device.</p>
-        <div class="pick-save"><div><b>Account</b><span>Day ${cloud.day} · ${fmt(cloud.money)}</span></div><div><b>This device</b><span>Day ${local.day} · ${fmt(local.money)}</span></div></div>`,
-      buttons: [{ label: 'Use account save', value: 'cloud', cls: 'primary' }, { label: 'Keep this device', value: 'local' }],
+      icon: icon('cloud'), title: 'Bring your progress?',
+      html: `<p>You played without an account on this device (Day ${g.day}, ${fmt(g.money)}).</p><p>Move that progress into <b>${esc(newAuth.username)}</b>?</p>`,
+      buttons: [{ label: 'Bring it', value: true, cls: 'primary' }, { label: 'Start fresh', value: false }],
     });
-    if (v === 'cloud') { hooks.loadState && hooks.loadState(cloud); return; }
+    if (v) moveSlot(null, newAuth.username);
   }
-  return syncNow();
+  location.reload();
 }
 
 export function openAccount() {
@@ -380,17 +538,22 @@ export function openAccount() {
         card.appendChild(h('div', 'card-body', `<div class="acct-stats"><div><b>${fmt(counter('earned'))}</b><span>earned</span></div><div><b>${fmt(st.money || 0)}</b><span>bank</span></div><div><b>${counter('days')}</b><span>days</span></div><div><b>${unlockedCount()}</b><span>awards</span></div></div><p class="muted">Your progress saves to your account after every patient, so you can play on any device.</p>`));
         const row = h('div', 'card-buttons');
         const lb = h('button', 'btn primary', 'Leaderboards'); lb.onclick = () => { sfx.click(); close(null); openLeaderboard(); };
-        const out = h('button', 'btn', 'Log out'); out.onclick = async () => { sfx.click(); await syncNow(); api('/logout', { method: 'POST', authed: true }); setAuth(null); render(); };
+        const out = h('button', 'btn', 'Log out'); out.onclick = async () => { sfx.click(); out.disabled = true; await syncNow(); await api('/logout', { method: 'POST', authed: true }); await switchTo(null); };
         row.append(lb, out);
-        if (isCreator()) { const g = h('button', 'btn', icon('book', 'in') + ' Secret guide'); g.onclick = () => { sfx.click(); close(null); openGuide(); }; row.prepend(g); }
+        if (isCreator()) {
+          const g = h('button', 'btn', icon('book', 'in') + ' Secret guide'); g.onclick = () => { sfx.click(); close(null); openGuide(); }; row.prepend(g);
+          const ad = h('button', 'btn', icon('shield', 'in') + ' Admin'); ad.onclick = () => { sfx.click(); close(null); openAdmin(); }; row.prepend(ad);
+        }
         card.appendChild(row);
         const del = h('button', 'link-btn danger', 'Delete my account');
         del.onclick = async () => {
-          const ok = await message({ icon: icon('trash'), title: 'Delete account?', html: `<p>This removes <b>${esc(auth.username)}</b> from the leaderboards and deletes the cloud save. The game on this device keeps its progress.</p>`, buttons: [{ label: 'Cancel', value: false }, { label: 'Delete it', value: true, cls: 'danger' }] });
+          const ok = await message({ icon: icon('trash'), title: 'Delete account?', html: `<p>This removes <b>${esc(auth.username)}</b> from the leaderboards and deletes its saved progress for good.</p>`, buttons: [{ label: 'Cancel', value: false }, { label: 'Delete it', value: true, cls: 'danger' }] });
           if (!ok) return openAccount();
+          const name = auth.username;
           const r = await api('/me', { method: 'DELETE', authed: true });
-          if (r.ok) setAuth(null);
-          openAccount();
+          if (!r.ok) return openAccount();
+          try { [SAVE_BASE, PRO_KEY].forEach(b => localStorage.removeItem(slotKey(b, name))); } catch (e) { /* ignore */ }
+          await switchTo(null);
         };
         card.appendChild(del);
         return;
@@ -429,11 +592,15 @@ export function openAccount() {
         const r = await api(mode === 'create' ? '/register' : '/login', { method: 'POST', body: { username: u, password: p } });
         btn.disabled = false; setMode(mode);
         if (!r.ok) { err.textContent = r.error; sfx.bad(); return; }
-        setAuth({ token: r.token, username: r.username });
         sfx.great();
-        if (mode === 'create') await syncNow();
-        else { const me = await api('/me', { authed: true }); if (me.ok) await reconcile(me); }
-        openAccount();
+        const wasGuest = !auth.token;
+        if (!wasGuest) await syncNow(); // keep the old account's latest progress in its own cloud save
+        let cloudEmpty = true;
+        if (mode === 'login') {
+          const me = await fetch(API + '/me', { headers: { Authorization: 'Bearer ' + r.token } }).then(x => x.json()).catch(() => null);
+          cloudEmpty = !(me && me.save && me.save.state);
+        }
+        await switchTo({ token: r.token, username: r.username }, { offerGuest: wasGuest, cloudEmpty });
       };
     };
     render();
@@ -504,7 +671,8 @@ export function openSettings() {
       return b;
     };
     row(icon('soundOn', 'in') + ' Sound effects', slider('sfx'));
-    row(icon('note', 'in') + ' Music', slider('music'));
+    row(icon('music', 'in') + ' Music', slider('music'));
+    row(icon('voice', 'in') + ' Patient voices', toggle(() => settings.voices, v => { settings.voices = v; saveSettings(); applySettings(); }));
     row(icon('speech', 'in') + ' Talking speed', seg('talk', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']]));
     row(icon('palette', 'in') + ' Graphics', seg('quality', [['auto', 'Pretty'], ['fast', 'Fast']]));
     row(icon('boom', 'in') + ' Screen shake', toggle(() => settings.shake, v => { settings.shake = v; saveSettings(); applySettings(); }));
@@ -527,7 +695,7 @@ export function openSettings() {
     const cheatBox = h('div', 'cheats'); list.appendChild(cheatBox);
     const renderCheats = () => {
       cheatBox.innerHTML = '';
-      const avail = Object.entries(CODES).filter(([k, c]) => c.cheat && profile.codes[k]).map(([, c]) => c.cheat);
+      const avail = Object.values(profile.codes).filter(c => c && typeof c === 'object' && c.cheat).map(c => c.cheat);
       for (const ch of avail) {
         const r = h('div', 'set-row');
         r.appendChild(h('span', 'set-label', icon('sparkle', 'in') + ' ' + CHEAT_NAMES[ch]));
@@ -542,13 +710,16 @@ export function openSettings() {
     const acct = h('button', 'btn small', icon('user', 'in') + ' ' + (auth.token ? esc(auth.username) : 'Account'));
     acct.onclick = () => { sfx.click(); openAccount(); };
     btns.append(tut, acct);
-    if (isCreator()) { const g = h('button', 'btn small', icon('book', 'in') + ' Secret guide'); g.onclick = () => { sfx.click(); openGuide(); }; btns.appendChild(g); }
+    if (isCreator()) {
+      const g = h('button', 'btn small', icon('book', 'in') + ' Secret guide'); g.onclick = () => { sfx.click(); openGuide(); }; btns.appendChild(g);
+      const ad = h('button', 'btn small', icon('shield', 'in') + ' Admin'); ad.onclick = () => { sfx.click(); openAdmin(); }; btns.appendChild(ad);
+    }
     card.appendChild(btns);
     const erase = h('button', 'link-btn danger', 'Erase everything on this device');
     erase.onclick = async () => {
       const ok = await message({ icon: icon('warning'), title: 'Erase everything?', html: '<p>This wipes your days, money, upgrades, achievements and settings on this device. If you have an account, your cloud save stays.</p>', buttons: [{ label: 'Cancel', value: false }, { label: 'Erase it all', value: true, cls: 'danger' }] });
       if (!ok) return openSettings();
-      try { ['doctor-chaos-save-v1', SET_KEY, PRO_KEY, AUTH_KEY].forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
+      try { Object.keys(localStorage).filter(k => k.startsWith('doctor-chaos-')).forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
       location.reload();
     };
     card.appendChild(erase);
@@ -568,7 +739,8 @@ export async function initMeta(h2) {
   // a little something for anyone who opens the browser console
   try {
     console.log('%cDOCTOR CHAOS', 'font-size:20px;font-weight:bold;color:#ff8a2a');
-    console.log('%cPsst. You opened the console. That makes you a hacker. Secret code: HACKER. Nurse Pat is watching.', 'color:#2bb3a3');
+    console.log('%cPsst. You opened the console. Real hackers can read this:', 'color:#2bb3a3');
+    console.log('%c01001000 01000001 01000011 01001011 01000101 01010010', 'color:#2bb3a3;font-family:monospace');
   } catch (e) { /* ignore */ }
   if (auth.token) {
     const me = await api('/me', { authed: true });
@@ -578,7 +750,7 @@ export async function initMeta(h2) {
       // same account on another device: whichever save is newer wins
       const cloud = me.save && me.save.state, local = hooks.getState ? hooks.getState() : null;
       if (cloud && (!local || (cloud.savedAt || 0) > (local.savedAt || 0))) hooks.loadState && hooks.loadState(cloud);
-      else queueSync(true);
+      else { queueSync(true); claimGifts(); }
     }
   }
 }

@@ -140,7 +140,7 @@ export function buildRoom(scene) {
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = '#1d2b36'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, W - 10, H - 10);
     ctx.fillStyle = '#1d2b36'; ctx.textAlign = 'center';
-    const rows = [['E', 92], ['F P', 56], ['T O Z', 42], ['L P E D', 32], ['P E C F D', 25], ['I M A D O C', 19], ['N O T R E A L L Y', 14], ['C O D E :  B I G H E A D', 7]];
+    const rows = [['E', 92], ['F P', 56], ['T O Z', 42], ['L P E D', 32], ['P E C F D', 25], ['I M A D O C', 19], ['N O T R E A L L Y', 14], ['D A E H G I B  : E D O C', 6]];
     let y = 26;
     for (const [t, s] of rows) { y += s; ctx.font = `700 ${s}px Arial, sans-serif`; ctx.fillText(t, W / 2, y); y += 12; }
   }, 2).tex;
@@ -207,9 +207,11 @@ export function buildRoom(scene) {
   monScreen.position.set(0, 1.38, 0.062); mon.add(monScreen);
   mon.rotation.y = 0.5;
   scene.add(mon);
-  const ecg = { bpm: 78, phase: 0, pts: new Array(128).fill(0.5), flat: false };
+  const ecg = { bpm: 78, phase: 0, pts: new Array(128).fill(0.5), flat: false, text: null, textT: 0 };
   R.monitor = {
+    group: mon,
     setBPM(b) { ecg.bpm = b; }, get bpm() { return ecg.bpm; }, setFlat(f) { ecg.flat = f; },
+    showText(lines, sec = 3) { ecg.text = lines; ecg.textT = sec; },
     update(dt) {
       const prev = ecg.phase;
       ecg.phase += dt * ecg.bpm / 60;
@@ -219,6 +221,15 @@ export function buildRoom(scene) {
         if (ph > 0.1 && ph < 0.14) v = 0.48; else if (ph > 0.14 && ph < 0.18) v = 0.1; else if (ph > 0.18 && ph < 0.22) v = 0.85; else if (ph > 0.35 && ph < 0.45) v = 0.45;
       }
       ecg.pts.push(v); ecg.pts.shift();
+      if (ecg.textT > 0) {
+        ecg.textT -= dt;
+        const ctx = monCanvas.ctx;
+        ctx.fillStyle = '#062019'; ctx.fillRect(0, 0, 256, 180);
+        ctx.fillStyle = Math.floor(ecg.textT * 3) % 2 ? '#5dffb0' : '#b8ffd9'; ctx.textAlign = 'center'; ctx.font = '700 46px Arial';
+        ecg.text.forEach((ln, i) => ctx.fillText(ln, 128, 78 + i * 54 - (ecg.text.length - 1) * 20));
+        monCanvas.tex.needsUpdate = true;
+        return;
+      }
       if (Math.floor(prev * 4) !== Math.floor(ecg.phase * 4)) {
         const ctx = monCanvas.ctx;
         ctx.fillStyle = '#062019'; ctx.fillRect(0, 0, 256, 180);

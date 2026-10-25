@@ -37,7 +37,7 @@ export async function play(G, P) {
   await E.frame(m0.clone().add(new THREE.Vector3(0.04 * s, 0.04 * s, 0)), 0.55 * s, 0.4 * s, new THREE.Vector3(0.12, 0.08, 1), 0.8);
   const diff = G.tutorial ? 0 : Math.min(1.4, G.diff);
   const th = thermometer(); th.scale.setScalar(person.s * 1.15); S.add(th);
-  const hand = holdWith(th, G.coatColor || '#ffffff', [0.122, 0, 0], [0, 0, Math.PI / 2], 0.85);
+  const hand = holdWith(th, G.coatColor || '#ffffff', [0.122, 0, 0], [0, 0, Math.PI / 2], 0.85, [1, 0, 0]);
   const R = 0.05 * s * G.tol;
   const ringMat = new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, opacity: 0.9, depthTest: false }); ringMat.userData.dispose = true;
   const ring = new THREE.Mesh(new THREE.RingGeometry(R * 0.75, R, 28), ringMat); ring.renderOrder = 5; S.add(ring);

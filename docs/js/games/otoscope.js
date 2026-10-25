@@ -42,6 +42,7 @@ function drawThing(ctx, k, x, y, s) {
   if (k === 'popcorn') { for (const [a, b, r] of [[-6, 2, 7], [5, 3, 7], [0, -5, 7], [3, 7, 5]]) circ(a, b, r, '#fff8dc'); }
   if (k === 'pea') { circ(0, 0, 9, '#6ab04c'); }
   if (k === 'note') { ctx.fillStyle = '#ffffff'; ctx.save(); ctx.rotate(-0.2); ctx.fillRect(-12, -9, 24, 18); ctx.strokeRect(-12, -9, 24, 18); ctx.fillStyle = '#1d2b36'; ctx.font = '700 11px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.fillText('HI', 0, 4); ctx.restore(); }
+  if (k === 'secret') { ctx.save(); ctx.rotate(0.35); ctx.fillStyle = '#fff8dc'; ctx.fillRect(-15, -7, 30, 14); ctx.strokeRect(-15, -7, 30, 14); ctx.fillStyle = '#7b3fa0'; ctx.font = '700 7px Fredoka, Arial'; ctx.textAlign = 'center'; ctx.fillText('XAWRAE', 0, 3); ctx.restore(); }
   if (k === 'crayon') { ctx.save(); ctx.rotate(0.6); ctx.fillStyle = '#2ecc71'; ctx.fillRect(-12, -5, 20, 10); ctx.strokeRect(-12, -5, 20, 10); ctx.beginPath(); ctx.moveTo(8, -5); ctx.lineTo(16, 0); ctx.lineTo(8, 5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
   ctx.restore();
 }
@@ -79,6 +80,8 @@ export async function play(G, P) {
     const a = (i / n) * Math.PI * 2 + rand(-0.4, 0.4), r = rand(0.35, 1);
     return { k, x: W / 2 + Math.cos(a) * rx * r, y: H / 2 + Math.sin(a) * ry * r, found: false, s: 0.95 + Math.random() * 0.3 };
   });
+  // once in a while there is a secret note way off to the side (not needed to win)
+  if (!G.tutorial && Math.random() < 0.12) { const a = rand(0, Math.PI * 2); items.push({ k: 'secret', x: W / 2 + Math.cos(a) * rx * 1.15, y: H / 2 + Math.sin(a) * ry * 1.1, found: false, s: 0.7, bonus: true }); }
   const lensR = Math.max(70, Math.min(W, H) * 0.17) * (G.tutorial ? 1.25 : 1) * Math.sqrt(G.tol);
   const lens = { x: W / 2, y: H / 2 };
   let t = 0, pokes = 0, found = 0, done = false;
@@ -117,6 +120,7 @@ export async function play(G, P) {
     if (done) return;
     const x = E.input.cx, y = E.input.cy;
     const hit = items.find(it => !it.found && Math.hypot(it.x + jig.x - x, it.y + jig.y - y) < 26 * it.s && Math.hypot(it.x + jig.x - lens.x, it.y + jig.y - lens.y) < lensR + 10);
+    if (hit && hit.bonus) { hit.found = true; sfx.ding(); ui.pop('A secret note! It says XAWRAE. Backwards?', x, y - 30, 'good'); return; }
     if (hit) {
       hit.found = true; found++; sfx.great();
       ui.pop(THINGS[hit.k], x, y - 30, 'good');

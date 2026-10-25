@@ -1,3 +1,4 @@
+import { speak, stop as stopSpeech } from './speech.js';
 import { sfx } from './audio.js';
 import { icon } from './icons.js';
 
@@ -42,6 +43,7 @@ export const TOOLS = [
 
 const NURSE_SVG = '<svg viewBox="0 0 64 64"><circle cx="32" cy="36" r="20" fill="#c68642"/><path d="M12 34 q0 -22 20 -22 q20 0 20 22 q-4 -12 -20 -12 q-16 0 -20 12z" fill="#2b1d14"/><path d="M16 18 q16 -12 32 0 l-2 6 q-14 -8 -28 0z" fill="#fff" stroke="#1d2b36" stroke-width="2"/><rect x="29" y="12" width="6" height="10" fill="#ff4d5e"/><rect x="27" y="14" width="10" height="6" fill="#ff4d5e"/><circle cx="25" cy="37" r="2.6" fill="#1d2b36"/><circle cx="39" cy="37" r="2.6" fill="#1d2b36"/><path d="M26 45 q6 5 12 0" stroke="#1d2b36" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M21 32 l7 -1.5 M43 32 l-7 -1.5" stroke="#1d2b36" stroke-width="2" stroke-linecap="round"/></svg>';
 
+export const NURSE_VOICE = { id: 'nurse-pat', name: 'Nurse Pat', gender: 'f', age: 'adult', pitch: 1.02 };
 export function createUI(root, E) {
   const ui = { talk: { speed: 1, hold: 1 } };
   const layer = (cls) => { const el = h('div', cls); root.appendChild(el); return el; };
@@ -109,7 +111,9 @@ export function createUI(root, E) {
     let killed = false;
     b.kill = () => { if (killed) return; killed = true; live.delete(b); el.classList.add('out'); setTimeout(() => el.remove(), 250); };
     live.add(b);
-    if (o.pitch !== 0 && !o.silent) sfx.babble(text, o.pitch || 1);
+    // real voices when the device has them, the old babble when it does not
+    const spoken = o.voice && !o.silent && o.pitch !== 0 ? speak(text, o.voice) : null;
+    if (!spoken && o.pitch !== 0 && !o.silent) sfx.babble(text, o.pitch || 1);
     let i = 0;
     const speed = (o.fast ? 90 : 55) * ui.talk.speed;
     return new Promise(res => {
@@ -121,6 +125,12 @@ export function createUI(root, E) {
           clearInterval(iv);
           const hold = (o.hold !== undefined ? o.hold : 1.2 + total * 0.035) * ui.talk.hold;
           if (o.persist) { res(b); return; }
+          if (spoken) {
+            // stay up until the voice finishes the line (plus a short beat)
+            const t0 = performance.now();
+            spoken.done.then(() => { const left = Math.max(0.35 * 1000, hold * 1000 - (performance.now() - t0)); setTimeout(() => { b.kill(); res(b); }, Math.min(left, 900)); });
+            return;
+          }
           setTimeout(() => { b.kill(); res(b); }, hold * 1000);
         }
       }, 33);
@@ -145,17 +155,19 @@ export function createUI(root, E) {
   ui.nurse = (text, o = {}) => {
     nurse.classList.remove('hidden');
     nText.innerHTML = text;
-    sfx.babble(text.replace(/<[^>]+>/g, ''), 1.25);
+    if (!speak(text, NURSE_VOICE)) sfx.babble(text.replace(/<[^>]+>/g, ''), 1.25);
     const wait = o.wait !== false;
     nBtn.classList.toggle('hidden', !wait);
     nBtn.textContent = o.button || 'Next';
     if (!wait) { nurseResolve = null; return Promise.resolve(); }
-    return new Promise(res => { nurseResolve = () => { if (o.hide !== false) nurse.classList.add('hidden'); res(); }; });
+    return new Promise(res => { nurseResolve = () => { stopSpeech(); if (o.hide !== false) nurse.classList.add('hidden'); res(); }; });
   };
   ui.nurseHide = () => { nurse.classList.add('hidden'); nurseResolve = null; };
 
   // ---------- chart ----------
-  const chart = layer('chart hidden');
+  const chart = layer('chart hidden interactive');
+  // tap the chart to fold it out of the way (and again to open it)
+  chart.addEventListener('click', () => { sfx.click(); chart.classList.toggle('min'); });
   ui.chart = (c, o = {}) => {
     chart.innerHTML = '';
     chart.append(
@@ -168,14 +180,28 @@ export function createUI(root, E) {
     if (o.note) chart.append(h('div', 'chart-note', `${icon('pencil', 'in')} <b>Nurse's note:</b> ${o.note}`));
     if (c.steps.length > 1) chart.append(h('div', 'chart-row small', `Needs ${c.steps.length} things today.`));
     chart.classList.remove('hidden');
+    chart.classList.remove('min');
   };
   ui.hideChart = () => chart.classList.add('hidden');
 
   // ---------- tool tray ----------
   const tray = layer('tray hidden');
+  // the tray can fold down to a small tab so you can see (and poke) the room behind it
+  let trayMin = false;
+  try { trayMin = localStorage.getItem('doctor-chaos-tray-min') === '1'; } catch (e) { /* ignore */ }
+  const setTrayMin = v => { trayMin = v; tray.classList.toggle('min', v); try { localStorage.setItem('doctor-chaos-tray-min', v ? '1' : '0'); } catch (e) { /* ignore */ } };
   ui.pickTool = (o = {}) => new Promise(res => {
     tray.innerHTML = '';
-    tray.appendChild(h('div', 'tray-title', o.title || 'Pick a tool'));
+    const head = h('div', 'tray-head');
+    head.appendChild(h('div', 'tray-title', o.title || 'Pick a tool'));
+    const fold = h('button', 'tray-fold interactive', icon('chevron', 'in'));
+    fold.title = 'Hide or show the tools';
+    fold.setAttribute('aria-label', 'Hide or show the tools');
+    fold.onclick = e => { e.stopPropagation(); sfx.click(); setTrayMin(!trayMin); };
+    head.appendChild(fold);
+    tray.appendChild(head);
+    head.onclick = () => { if (trayMin) { sfx.click(); setTrayMin(false); } };
+    tray.classList.toggle('min', trayMin && !o.highlight);
     const row = h('div', 'tray-row');
     for (const t of TOOLS) {
       const b = h('button', 'tool interactive' + (o.highlight === t.id ? ' glow' : ''), `${ICONS[t.id]}<span>${t.label}</span>`);

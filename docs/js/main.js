@@ -8,6 +8,8 @@ import { sfx, music } from './audio.js';
 import * as D from './data.js';
 import { clipboard } from './props.js';
 import { route, SPOTS } from './nav.js';
+import { voice, unlockSpeech, stop as stopSpeech } from './speech.js';
+import { NURSE_VOICE } from './ui.js';
 import * as removal from './games/removal.js';
 import * as shot from './games/shot.js';
 import * as blood from './games/blood.js';
@@ -35,11 +37,13 @@ const GAMES = { removal, shot, blood, surgery, reflex, steth, cast, babyshot: ba
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // ---------------- save ----------------
-const SAVE_KEY = 'doctor-chaos-save-v1';
-const fresh = () => ({ v: 1, day: 1, money: 200, upgrades: { steady: 0, lawyer: 0, shoes: 0, lolli: 0, coats: 0 }, coat: '#ffffff', tutorialDone: false, seen: [], muted: false, usedExcuses: [], nextSpecialDay: null, specialBag: [], personaBag: [], lastSpecial: null, plan: null, dayRun: null, savedAt: 0, stats: { patients: 0, threeStars: 0, lawsuits: 0, paidOut: 0, bestDay: 0 } });
+const SAVE_KEY = M.saveKey(); // each account (and guest play) has its own slot
+const fresh = () => ({ v: 1, day: 1, money: 200, rank: 0, upgrades: { steady: 0, lawyer: 0, shoes: 0, lolli: 0, coats: 0 }, coat: '#ffffff', tutorialDone: false, seen: [], muted: false, usedExcuses: [], nextSpecialDay: null, specialBag: [], personaBag: [], lastSpecial: null, plan: null, dayRun: null, savedAt: 0, stats: { patients: 0, threeStars: 0, lawsuits: 0, paidOut: 0, bestDay: 0 } });
 function loadSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.v === 1) return { ...fresh(), ...s, upgrades: { ...fresh().upgrades, ...s.upgrades }, stats: { ...fresh().stats, ...s.stats } }; } catch (e) { /* ignore */ } return null; }
 let state = loadSave() || fresh();
 const hadSave = !!loadSave();
+// Upgrade levels past the third (unlocked by promotions) still help, just a bit less each.
+function upgEff(k) { const l = state.upgrades[k] || 0; return Math.min(l, 3) + 0.5 * Math.max(0, l - 3); }
 function writeSave() { try { state.seen = ui.seenList(); state.muted = sfx.muted; state.savedAt = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } M.queueSync(); }
 
 // ---------------- setup ----------------
@@ -58,10 +62,18 @@ ui.onMute = m => {
 };
 ui.onFullscreen = () => M.goFullscreen();
 // Pause menu: resume, settings, or leave to the main menu (progress is kept at the current patient).
+let pauseTaps = 0;
 ui.onGear = async () => {
   if (M.isPanelOpen()) return;
   E.paused = true;
   while (true) {
+    setTimeout(() => {
+      const ic = document.querySelector('.pause-card .card-icon');
+      if (ic) ic.onclick = () => {
+        pauseTaps++; sfx.blip(0.7 + pauseTaps * 0.05);
+        if (pauseTaps === 10) { M.unlock('nap'); sfx.snore(); const p = document.querySelector('.pause-card .card-body') || ic.parentElement; p.insertAdjacentHTML('beforeend', '<p class="muted">Zzz... you paused so hard you fell asleep. Nurse Pat stuck a note on your forehead. It says NAPTIME.</p>'); }
+      };
+    }, 50);
     const v = await M.message({
       icon: M.icon('pause'), title: 'Paused',
       html: `<p>${G.cur ? `You're with <b>${G.cur.c.name}</b>.` : 'Take a breather.'}</p>`,
@@ -87,11 +99,13 @@ let clockSpin = false;
 const LIGHT0 = { hemi: R.hemi.intensity, hemiC: R.hemi.color.clone(), sun: R.sun.intensity };
 function applyGameSettings(st) {
   ui.talk.speed = { slow: 0.6, normal: 1, fast: 1.7 }[st.talk] || 1;
+  voice.speed = { slow: 0.85, normal: 1, fast: 1.3 }[st.talk] || 1;
   ui.talk.hold = { slow: 1.6, normal: 1, fast: 0.75 }[st.talk] || 1;
   E.setQuality(st.quality === 'fast');
   E.noShake = !st.shake;
   const ch = st.cheats || {};
-  FLAGS.bighead = !!ch.bighead; FLAGS.party = !!ch.party; FLAGS.zoomies = !!ch.zoomies;
+  FLAGS.bighead = !!ch.bighead; FLAGS.party = !!ch.party; FLAGS.zoomies = !!ch.zoomies; FLAGS.cats = !!ch.cats;
+  voice.robot = !!ch.robot; voice.enabled = st.voices !== false; voice.squeaky = !!ch.squeaky;
   sfx.pitch = ch.squeaky ? 1.8 : 1;
   if (ch.spooky) { R.hemi.color.set('#b18cff'); R.hemi.intensity = LIGHT0.hemi * 0.6; R.sun.intensity = LIGHT0.sun * 0.35; }
   else { R.hemi.color.copy(LIGHT0.hemiC); R.hemi.intensity = LIGHT0.hemi; R.sun.intensity = LIGHT0.sun; }
@@ -105,7 +119,12 @@ nurse.target.shL = [-0.35, 0, 0.12]; nurse.target.elL = [-1.25, 0.2, 0]; nurse.t
 const nurseClip = clipboard(); nurseClip.scale.setScalar(0.75); nurseClip.position.set(0.0, -0.3, 0.07); nurseClip.rotation.set(-1.0, 0, 0); nurse.j.elL.add(nurseClip);
 E.scene.add(nurse.root);
 E.onUpdate((dt, t) => nurse.update(dt, t));
-const nurseSay = (text, o = {}) => { nurse.talk(Math.min(2.5, text.length * 0.04)); return ui.say(() => nurse.headTop(), text, { name: 'Nurse Pat', pitch: 1.25, key: 'nurse3d', ...o }); };
+const nurseSay = (text, o = {}) => { nurse.talk(Math.min(2.5, text.length * 0.04)); return ui.say(() => nurse.headTop(), text, { name: 'Nurse Pat', pitch: 1.25, key: 'nurse3d', voice: { ...NURSE_VOICE, onStart: est => nurse.talk(est), onEnd: () => nurse.talk(0) }, ...o }); };
+// a steady voice for each patient: same name, same voice
+function voiceOf(c, age) {
+  let hsh = 0; for (const ch of c.name || c.first || '') hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+  return { id: c.name, name: c.first, gender: c.gender || (c.look && c.look.gender) || 'm', age: age || c.ageGroup || 'adult', pitch: 0.92 + (hsh % 17) / 100, excited: c.personality === 'influencer' };
+}
 const nursePanel = async (text, o) => { nurse.talk(Math.min(2.5, text.length * 0.03)); return ui.nurse(text, o); };
 
 // ---------------- game context ----------------
@@ -113,10 +132,11 @@ const G = {
   THREE, E, ui, sfx, music, room: R,
   tutorial: false,
   cur: null,
-  // Harder from the start, full speed by day 6, and it keeps creeping up after that.
-  get diff() { const d = state.day; return clamp(0.3 + (d - 1) * 0.14, 0, 1) + clamp((d - 6) * 0.035, 0, 0.5); },
-  get tol() { return 1 + 0.14 * (state.upgrades.steady || 0); },
-  upg: k => state.upgrades[k] || 0,
+  // Ramps up over the first week, creeps a little after that, and every promotion adds a step.
+  get diff() { const d = state.day; return clamp(0.2 + (d - 1) * 0.12, 0, 1) + clamp((d - 8) * 0.025, 0, 0.35) + 0.1 * (state.rank || 0); },
+  get tol() { return 1 + 0.13 * upgEff('steady'); },
+  upg: k => upgEff(k),
+  get rank() { return state.rank || 0; },
   get coatColor() { return state.coat; },
   bandageColor: '#ffcc80',
   howTo: (id, title, lines, icon) => ui.howTo(id, title, lines, icon),
@@ -136,7 +156,9 @@ const G = {
     if (mime && !t.startsWith('(')) t = /!|\?|OW|AA|OU/i.test(t) ? pick(['(Silently screams. Very dramatic.)', '(Mimes fainting. Gets back up.)', '(Points at you angrily. No sound.)']) : pick(['(Nods enthusiastically.)', '(Gives a thumbs up.)', '(Mimes applause.)']);
     if (P.person instanceof Baby) t = pick(['Goo?', 'Bwaah!', 'Ga ga!', 'Pfffbt.']);
     P.person.talk(Math.min(2.5, t.length * 0.045));
-    return ui.say(() => P.person.headTop(), t, { name: P.person instanceof Baby ? P.c.first : P.c.first, pitch: mime ? 0 : P.c.voice, ...o });
+    const who = voiceOf(P.c, P.person instanceof Baby ? 'baby' : null);
+    who.onStart = est => P.person.talk(est); who.onEnd = () => P.person.talk(0);
+    return ui.say(() => P.person.headTop(), t, { name: P.c.first, pitch: mime ? 0 : P.c.voice, voice: mime ? null : who, ...o });
   },
 };
 window.__G = G;
@@ -145,6 +167,8 @@ window.__state = () => state;
 M.initMeta({
   addMoney: n => { state.money += n; ui.setHUD({ money: state.money }); writeSave(); M.checkState(state); },
   getState: () => state,
+  applyGift,
+  upgradeList: () => UPGRADES.map(u => ({ id: u.id, name: u.name, icon: u.icon })),
   loadState: st => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(st)); } catch (e) { /* ignore */ } location.reload(); },
   resetTips: () => ui.resetSeen(),
   specialTypes: D.SPECIAL_TYPES,
@@ -158,6 +182,15 @@ const fmt = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString()
 function walkRoute(person, to, speed = 1.5, run = false) {
   const p = person.root.position;
   return person.walkPath(E, route({ x: p.x, z: p.z }, to), speed, run);
+}
+
+// Close-up on a patient's face while they talk, so you can see how they feel.
+function faceCam(person, dur = 0.6) {
+  if (!person || !person.headCenter) return Promise.resolve();
+  const s = person.s || 0.6;
+  // aim a little above the head so the face sits low in the frame and the speech bubble fits on top
+  const c = person.headCenter(); c.y += 0.14 * s;
+  return E.frame(c, 0.85 * s, 0.68 * s, new THREE.Vector3(0.18, 0.04, 1), dur);
 }
 
 async function enterPatient(P) {
@@ -207,7 +240,20 @@ async function enterPatient(P) {
 async function exitPatient(P, stars = 2) {
   const { person, parent } = P;
   await E.home(0.5);
-  if (!parent && person.root.visible && P.c.special !== 'triplets') G.say(pick(stars >= 2 ? D.BYE.happy : D.BYE.sad), { key: 'c', hold: 0.6 });
+  if (person.root.visible && P.c.special !== 'triplets') {
+    const mood = ['sad', 'meh', 'good', 'great'][stars] || 'good';
+    const seen = new Set(state.byeSeen || []);
+    if (!parent) {
+      person.expr(mood === 'sad' ? 'angry' : mood === 'meh' ? 'worried' : 'happy');
+      const line = D.goodbye(P.c, mood, seen);
+      state.byeSeen = [...(state.byeSeen || []), line].slice(-160);
+      G.say(line, { key: 'c', hold: 0.6 });
+    } else {
+      const line = D.goodbye({ ...P.c.parent, ageGroup: 'adult', steps: P.c.steps }, mood, seen);
+      state.byeSeen = [...(state.byeSeen || []), line].slice(-160);
+      ui.say(() => parent.headTop(), line, { name: P.c.parent.title, key: 'parent', hold: 0.6, voice: voiceOf({ name: P.c.parent.first || P.c.parent.title, gender: P.c.parent.look && P.c.parent.look.gender, ageGroup: 'adult' }) });
+    }
+  }
   if (parent) {
     sfx.pop();
     await E.tween(0.25, k => person.root.scale.setScalar(Math.max(0.01, 1 - k)));
@@ -320,8 +366,8 @@ async function lightsOutSequence(P) {
 
 function lawsuitAmount(sev) {
   const base = sev >= 3 ? rand(1100, 2000) : sev === 2 ? rand(450, 800) : rand(160, 300);
-  const raw = base * (1 + (state.day - 1) * 0.08);
-  const cut = raw * (1 - 0.2 * (state.upgrades.lawyer || 0));
+  const raw = base * (1 + (state.day - 1) * 0.06) * (1 + 0.15 * (state.rank || 0));
+  const cut = raw * (1 - Math.min(0.8, 0.2 * upgEff('lawyer')));
   return { raw: Math.round(raw / 10) * 10, final: Math.round(cut / 10) * 10 };
 }
 
@@ -337,16 +383,28 @@ function coffeeBreak(P) {
 }
 
 // Poking things in the room while picking a tool.
-const pokes = { nurse: 0, clock: 0, plant: 0 };
+const pokes = { nurse: 0, clock: 0, plant: 0, monitor: 0, spins: 0 };
 E.input.listeners.down.add(async () => {
   if (!G.dbg || G.dbg.kind !== 'tool' || M.isPanelOpen()) return;
-  const hit = E.pickObjects([nurse.root, R.clock, R.plant]);
+  const hit = E.pickObjects([nurse.root, R.clock, R.plant, R.monitor.group]);
   if (!hit) return;
-  let o = hit.object; while (o && o !== nurse.root && o !== R.clock && o !== R.plant) o = o.parent;
+  let o = hit.object; while (o && o !== nurse.root && o !== R.clock && o !== R.plant && o !== R.monitor.group) o = o.parent;
+  if (o === R.monitor.group) {
+    const n = ++pokes.monitor;
+    sfx.beep();
+    if (n === 6) {
+      pokes.monitor = 0; M.unlock('flatline');
+      R.monitor.setFlat(true); sfx.flatline();
+      await nurseSay('DOCTOR! The monitor! Oh. Wait. You just unplugged it. Stop that.', { hold: 1.4 });
+      R.monitor.showText(['BEEP', 'BOOP'], 4);
+      setTimeout(() => R.monitor.setFlat(false), 4200);
+    }
+    return;
+  }
   if (o === nurse.root) {
     const n = ++pokes.nurse;
     nurse.wiggle = 0.4; sfx.boing && sfx.boing();
-    if (n === 5) { M.unlock('nurse_poke'); nurseSay("Okay. OKAY. You want a secret? Type PARTY in the secret code box in Settings. Now stop poking me.", { hold: 2.5 }); }
+    if (n === 12) { M.unlock('nurse_poke'); nurseSay("OKAY. Fine. A secret code: it's the thing you throw on your birthday. Five letters. Now stop poking me.", { hold: 3 }); }
     else nurseSay(pick(['Yes?', 'Can I help you, Doctor?', 'Please pick a tool.', 'I am working.', 'Poking the nurse is not a medical procedure.', 'Doctor.']), { hold: 1 });
   } else if (o === R.clock) {
     const n = ++pokes.clock;
@@ -355,8 +413,9 @@ E.input.listeners.down.add(async () => {
       M.unlock('clock'); clockSpin = true;
       const hands = R.clock.children.slice(-2);
       await E.tween(1.6, k => { hands[0].rotation.z = k * 30; hands[1].rotation.z = -k * 12; });
-      clockSpin = false; pokes.clock = 0;
-      nurseSay('Stop touching the clock. Time is fragile.', { hold: 1.6 });
+      clockSpin = false; pokes.clock = 0; pokes.spins++;
+      if (pokes.spins >= 2) { pokes.spins = 0; sfx.thud(); nurseSay('You knocked the clock crooked. There is a note taped to the back. It says TICKTOCK. Who tapes notes to clocks?', { hold: 3 }); }
+      else nurseSay('Stop touching the clock. Time is fragile.', { hold: 1.6 });
     }
   } else if (o === R.plant) {
     const n = ++pokes.plant;
@@ -367,7 +426,7 @@ E.input.listeners.down.add(async () => {
 
 // ---------------- one patient ----------------
 async function runPatient(c, idx, total, hooks = {}) {
-  ui.setHUD({ patient: `Patient ${idx + 1}/${total}` });
+  ui.setHUD({ patient: `Patient ${idx + 1}/${total}${c.inspector ? ' · Inspector' : c.emergency ? ' · Emergency' : ''}` });
   let person, parent = null;
   if (c.special === 'baby') {
     parent = new Person(c.parent.look);
@@ -383,14 +442,18 @@ async function runPatient(c, idx, total, hooks = {}) {
   }
   const actors = [person, ...extras, ...(parent ? [parent] : [])];
   const offU = E.onUpdate((dt, t) => { for (const a of actors) a.update(dt, t); });
-  const P = { person, parent, extras, c, mood: 70 + 5 * (state.upgrades.lolli || 0) };
+  const P = { person, parent, extras, c, mood: Math.min(95, 70 + 5 * upgEff('lolli')) };
   G.cur = P;
   if (c.special) M.metSpecial(c.special);
   await enterPatient(P);
   const showNote = G.tutorial || state.day <= 2;
+  if (c.inspector) await nursePanel(pick(['Heads up. A hospital <b>inspector</b> is watching this one. Three stars gets you a bonus. A lawsuit costs extra.', 'See the person with the clipboard in the hallway? That is the <b>inspector</b>. Do this one right.']), { button: 'No pressure' });
+  if (c.emergency) await nursePanel(pick(['This one is an <b>EMERGENCY</b>. Pick the right tool before the timer runs out!', '<b>Emergency!</b> No time to stare at the tool tray. Pick fast!']), { button: 'Go!' });
   if (c.special !== 'baby') {
-    person.expr(c.personality === 'mime' ? 'smug' : 'smile');
+    person.expr(c.personality === 'mime' ? 'smug' : pick(['worried', 'sad', 'smile', 'worried']));
+    await faceCam(person);
     await G.say(c.complaint, { key: 'c', hold: 0.8 });
+    await E.home(0.55);
   }
   const results = [];
   let wrong = 0;
@@ -404,12 +467,27 @@ async function runPatient(c, idx, total, hooks = {}) {
     while (true) {
       const coffee = setTimeout(() => coffeeBreak(P), 120000);
       let waited = 0;
-      const tick = setInterval(() => { if (E.paused) return; waited += 2; if (waited > 10) G.mood(-1.5); }, 2000);
+      const tick = setInterval(() => { if (E.paused) return; waited += 2; if (waited > 14) G.mood(-1); }, 2000);
       const bored = setTimeout(() => { if (G.cur === P && c.special !== 'baby') G.say(pick(D.IMPATIENT[c.ageGroup] || D.IMPATIENT.adult), { key: 'c', hold: 1.2 }); }, 25000);
+      let emT = null;
+      if (c.emergency) {
+        let left = (state.rank || 0) >= 4 ? 8 : 10;
+        ui.timer.show(left);
+        emT = setInterval(() => {
+          if (E.paused) return;
+          left -= 0.25; ui.timer.set(left);
+          if (left <= 0) {
+            P.lateTools = (P.lateTools || 0) + 1; G.mood(-10); sfx.buzz(); ui.shakeTray(); person.expr('angry');
+            nurseSay(pick(['Too slow, Doctor! Pick something!', 'EMERGENCY means fast!', 'Tick tock, Doctor!']), { hold: 1 });
+            left = (state.rank || 0) >= 4 ? 8 : 10;
+          }
+        }, 250);
+      }
       const t = await ui.pickTool({ title: c.steps.length > 1 ? `Problem ${i + 1} of ${c.steps.length}: pick a tool` : 'Pick the right tool', highlight: G.tutorial ? tool : null });
       clearTimeout(coffee); clearTimeout(bored); clearInterval(tick);
+      if (emT) { clearInterval(emT); ui.timer.hide(); }
       if (t === tool) break;
-      wrong++; ui.shakeTray(); sfx.bad(); G.mood(-8);
+      wrong++; ui.shakeTray(); sfx.bad(); G.mood(-6);
       if (wrong >= 5) M.unlock('wrong_tools');
       person.expr('angry');
       if (c.special === 'baby') nurseSay(pick(['That is not for babies, Doctor.', 'The baby is judging you. I am also judging you.']), { hold: 1 });
@@ -448,6 +526,7 @@ async function runPatient(c, idx, total, hooks = {}) {
       if (extra.fail) { results.push({ ...extra, step }); break; }
     }
     let res;
+    music.play(step === 'surgery' ? 'surgery' : 'focus');
     try {
       res = await GAMES[step].play(G, P, c.params[step] || {});
     } catch (err) {
@@ -455,6 +534,7 @@ async function runPatient(c, idx, total, hooks = {}) {
       res = { score: 60, fail: false };
     }
     ui.hint(null); ui.timer.hide(); ui.clearActions();
+    music.play('clinic');
     res.step = step;
     results.push(res);
     if (!res.fail) M.usedTool(tool, TOOLS.map(t => t.id));
@@ -469,10 +549,11 @@ async function runPatient(c, idx, total, hooks = {}) {
   const failRes = results.find(r => r.fail);
   let score = results.reduce((a, r) => a + r.score, 0) / Math.max(1, results.length);
   if (extra && extra.score !== undefined) score = score * 0.8 + extra.score * 0.2;
-  score = clamp(score - wrong * 8, 0, 100);
-  const stars = fail ? 0 : score >= 90 ? 3 : score >= 70 ? 2 : 1;
-  let pay = fail ? 0 : Math.round(c.basePay * [0, 0.55, 0.8, 1][stars]);
-  const tip = !fail && stars === 3 && P.mood > 62 ? Math.round(c.basePay * (0.15 + 0.05 * (state.upgrades.lolli || 0))) : 0;
+  score = clamp(score - wrong * 6 - (P.lateTools || 0) * 8, 0, 100);
+  const stars = fail ? 0 : score >= 88 ? 3 : score >= 65 ? 2 : 1;
+  const raise = 1 + 0.25 * (state.rank || 0);
+  let pay = fail ? 0 : Math.round(c.basePay * raise * [0, 0.6, 0.82, 1][stars]);
+  const tip = !fail && stars === 3 && P.mood > 55 ? Math.round(c.basePay * raise * (0.15 + 0.05 * upgEff('lolli'))) : 0;
   const escaped = extra && extra.caught === false;
   person = P.person;
   if (stars === 3) M.unlock('three_stars');
@@ -481,13 +562,14 @@ async function runPatient(c, idx, total, hooks = {}) {
   if (!fail && c.personality === 'vampire' && results.some(r => r.step === 'blood')) M.unlock('vampire_blood');
   // reaction
   if (!escaped) {
-    if (fail) { person.expr(c.special === 'baby' ? 'cry' : 'angry'); if (c.special === 'baby') await ui.say(() => parent.headTop(), pick(['My lawyer will be calling.', 'We are LEAVING.']), { name: c.parent.title, key: 'parent', hold: 1 }); else await G.say(c.fail || pick(D.FAIL), { key: 'c', hold: 0.8 }); }
-    else if (c.special !== 'baby') { person.expr('happy'); await G.say(c.success || pick(D.SUCCESS[c.ageGroup] || D.SUCCESS.adult), { key: 'c', hold: 0.8 }); }
+    if (fail) { person.expr(c.special === 'baby' ? 'cry' : pick(['angry', 'angry', 'yell', 'cry'])); if (c.special !== 'baby') await faceCam(person, 0.5); if (c.special === 'baby') await ui.say(() => parent.headTop(), pick(['My lawyer will be calling.', 'We are LEAVING.']), { name: c.parent.title, key: 'parent', hold: 1, voice: voiceOf({ name: c.parent.first || c.parent.title, gender: c.parent.look && c.parent.look.gender, ageGroup: 'adult' }) }); else await G.say(c.fail || pick(D.FAIL), { key: 'c', hold: 0.8 }); }
+    else if (c.special !== 'baby') { person.expr(pick(['happy', 'happy', 'laugh'])); await faceCam(person, 0.5); await G.say(c.success || pick(D.SUCCESS[c.ageGroup] || D.SUCCESS.adult), { key: 'c', hold: 0.8 }); }
   }
   // results card
   const review = pick(D.REVIEWS[stars]);
   const who = c.special === 'baby' ? `${c.parent.title} of ${c.first}` : `${c.first}${typeof c.age === 'number' ? ', ' + c.age : ''}`;
   sfx[stars === 3 ? 'great' : stars > 0 ? 'good' : 'bad']();
+  if (stars === 3) music.sting('win');
   await ui.card({
     cls: 'result-card',
     html: `<div class="result-name">${c.name}</div>${ui.stars(stars)}
@@ -495,13 +577,20 @@ async function runPatient(c, idx, total, hooks = {}) {
       <div class="review">“${review}”<span>${who}</span></div>`,
     buttons: [{ label: fail ? 'Uh oh...' : 'Next', value: true }],
   });
-  const earned = pay + tip;
+  let bonus = 0;
+  if (c.inspector && stars === 3) {
+    bonus = Math.round(pay * 0.5);
+    await nursePanel(`The inspector wrote "flawless" on the clipboard. Hospital bonus: <b>${fmt(bonus)}</b>!`, { button: 'Nice' });
+    M.unlock('inspector');
+  }
+  const earned = pay + tip + bonus;
   if (earned) { G.addMoney(earned); sfx.cash(); }
   let lawsuit = null;
   if (fail) {
     const amt = lawsuitAmount(severity);
+    if (c.inspector) { amt.raw = Math.round(amt.raw * 1.5 / 10) * 10; amt.final = Math.round(amt.final * 1.5 / 10) * 10; }
     lawsuit = { amount: amt.final, raw: amt.raw, reason: failRes.reason };
-    sfx.gavel();
+    sfx.gavel(); music.sting('lose');
     const txt = D.lawsuitText(failRes.reason, c, failRes.step);
     const plaintiff = c.special === 'baby' ? `${c.parent.first} (${c.parent.title} of ${c.first})` : c.name;
     await ui.card({
@@ -512,7 +601,7 @@ async function runPatient(c, idx, total, hooks = {}) {
         <div class="severity sev${severity}">${['', 'Small Claims', 'Serious Lawsuit', 'MEGA LAWSUIT'][severity] || 'Lawsuit'}</div>
         <div class="claim">“${txt}”</div>
         <div class="damages">Damages: <b>${fmt(amt.final)}</b>${amt.final < amt.raw ? `<small>Your lawyer got it down from ${fmt(amt.raw)}.</small>` : ''}</div>
-        <div class="fine-print">Case No. ${Math.floor(rand(100000, 999999))}. Clerk's note: the courthouse vending machine code is SNACK. Please stop asking.</div>`,
+        <div class="fine-print">Case No. ${Math.floor(rand(100000, 999999))}.${severity >= 3 ? " Clerk's note: the courthouse vending machine code is SNACK. Please stop asking." : ''}</div>`,
       buttons: [{ label: 'Pay up', value: true }],
     });
     G.addMoney(-amt.final);
@@ -525,7 +614,7 @@ async function runPatient(c, idx, total, hooks = {}) {
   M.checkState(state);
   if (!escaped) await exitPatient(P, stars);
   offU();
-  for (const a of actors) { E.scene.remove(a.root); disposeObj(a.root); }
+  for (const a of actors) { E.scene.remove(a.root); disposeObj(a.root); a.dispose && a.dispose(); }
   G.cur = null;
   return { c, stars, pay: earned, lawsuit, review, fail };
 }
@@ -564,7 +653,7 @@ function planDay(day) {
   if (state.plan && state.plan.day === day) return state.plan;
   if (state.nextSpecialDay == null) state.nextSpecialDay = day + pick([0, 1]);
   let special = null;
-  if (day >= state.nextSpecialDay) {
+  if (day >= state.nextSpecialDay || (state.rank || 0) >= 5) {
     if (!state.specialBag || !state.specialBag.length) {
       let bag = shuffle(D.SPECIAL_TYPES);
       if (bag[0] === state.lastSpecial) bag.push(bag.shift());
@@ -584,11 +673,12 @@ function planDay(day) {
 }
 
 window.__planDay = d => planDay(d);
+window.__shop = () => shop();
 
 function dayLine(day) {
   const hr = new Date().getHours();
   if (hr >= 0 && hr < 4) return 'It is the middle of the night. Even the patients are yawning. Nurse Pat is wearing pajamas under her scrubs.';
-  if (day === 13) return 'Day 13. Nurse Pat brought a black cat for luck. It is wearing a tiny lab coat. It has already bitten someone.';
+  if (day === 13) { M.unlock('cat_day'); return 'Day 13. Nurse Pat brought a black cat for luck. It is wearing a tiny lab coat and a name tag that says MEOW. Nurse Pat swears that is also a secret code.'; }
   if (day === 42) return 'Day 42. The answer to everything. Except medicine. You still have to do the medicine.';
   if (day === 100) return 'Day 100! The hospital board sent a card. It says "Wow. Still here?"';
   return pick(D.FORECAST);
@@ -596,6 +686,7 @@ function dayLine(day) {
 
 async function playDay() {
   G.tutorial = false;
+  await M.claimGifts();
   const day = state.day;
   ui.showHUD(true);
   ui.setHUD({ day, money: state.money, patient: '' });
@@ -604,15 +695,21 @@ async function playDay() {
   if (!run) {
     const plan = planDay(day);
     const used = new Set(state.usedExcuses || []);
-    const list = D.generateDay(day, { used, special: plan.special, persona: plan.persona });
+    const list = D.generateDay(day, { used, special: plan.special, persona: plan.persona, rank: state.rank || 0 });
     state.usedExcuses = [...used];
+    // promoted doctors get inspectors and emergencies
+    const rk = state.rank || 0;
+    const normal = list.map((c, i) => (c.special ? -1 : i)).filter(i => i > 0);
+    const order = shuffle(normal);
+    if (rk >= 2 && order.length) list[order.pop()].inspector = true;
+    for (let k = 0; k < (rk >= 4 ? 2 : rk >= 3 ? 1 : 0) && order.length; k++) list[order.pop()].emergency = true;
     run = state.dayRun = { day, list: JSON.parse(JSON.stringify(list)), idx: 0, out: [], startMoney: state.money };
     writeSave();
     await E.home(0.6);
     await ui.card({
       icon: M.icon('hospital'),
       title: `Day ${day}`,
-      html: `<p><b>${WEEKDAYS[(day - 1) % 7]}.</b> ${list.length} patients in the waiting room.</p><p class="muted">${dayLine(day)}</p>`,
+      html: `${state.rank ? `<p class="day-rank">${M.icon('medal:1', 'in')} ${RANKS[rankOf()].name}</p>` : ''}<p><b>${WEEKDAYS[(day - 1) % 7]}.</b> ${list.length} patients in the waiting room.</p><p class="muted">${dayLine(day)}</p>`,
       buttons: [{ label: 'Open the clinic!', value: true }],
     });
   } else {
@@ -644,14 +741,14 @@ async function endOfDay(out, startMoney) {
   if (starsTotal >= 15) M.unlock('perfect_day');
   if (starsTotal === 0) M.unlock('zero_day');
   // running a clinic costs money every day: rent, supplies, and Nurse Pat's coffee
-  const bills = Math.round((60 + state.day * 15) / 5) * 5;
+  const bills = Math.round((40 + state.day * 10) * (1 + 0.2 * (state.rank || 0)) / 5) * 5;
   state.money -= bills; ui.setHUD({ money: state.money });
   state.stats.costs = (state.stats.costs || 0) + bills;
   state.stats.bestDay = Math.max(state.stats.bestDay, earned - sued - bills);
   const rows = out.map(r => `<tr><td>${r.name}</td><td class="st">${M.icon('star', 'in').repeat(r.stars)}${M.icon('starOff', 'in').repeat(3 - r.stars)}</td><td class="pos">${r.pay ? '+' + fmt(r.pay) : ''}</td><td class="neg">${r.lawsuit ? '−' + fmt(r.lawsuit.amount) : ''}</td></tr>`).join('');
   const goodReview = out.filter(r => r.stars >= 2).map(r => r.review)[0];
   const badReview = out.filter(r => r.stars <= 1).map(r => r.review)[0];
-  sfx.fanfare();
+  music.sting('dayEnd');
   await ui.card({
     icon: M.icon('moon'),
     title: `Day ${state.day} complete!`,
@@ -683,15 +780,55 @@ async function endOfDay(out, startMoney) {
 }
 
 const UPGRADES = [
-  { id: 'steady', name: 'Steady Hands', icon: 'hand', desc: 'Wider tunnels, bigger targets, friendlier lines.', costs: [300, 650, 1150] },
-  { id: 'lawyer', name: 'Lawyer on Speed Dial', icon: 'briefcase', desc: 'Every lawsuit costs 20% less per level.', costs: [260, 560, 1000] },
-  { id: 'shoes', name: 'Running Shoes', icon: 'shoe', desc: 'Run faster when patients try to escape.', costs: [180, 420, 800] },
-  { id: 'lolli', name: 'Lollipop Jar', icon: 'lollipop', desc: 'Babies calm down faster. Happy patients tip more.', costs: [180, 380, 750] },
+  { id: 'steady', name: 'Steady Hands', icon: 'hand', desc: 'Wider tunnels, bigger targets, friendlier lines.', costs: [260, 560, 1000] },
+  { id: 'lawyer', name: 'Lawyer on Speed Dial', icon: 'briefcase', desc: 'Every lawsuit costs less.', costs: [220, 480, 880] },
+  { id: 'shoes', name: 'Running Shoes', icon: 'shoe', desc: 'Run faster when patients try to escape.', costs: [150, 360, 700] },
+  { id: 'lolli', name: 'Lollipop Jar', icon: 'lollipop', desc: 'Babies calm down faster. Happy patients tip more.', costs: [150, 330, 650] },
+];
+// Max out every upgrade and you get promoted. Each rank opens one more level of every upgrade,
+// pays more, and changes the job a little.
+const RANKS = [
+  { name: 'Doctor', short: 'Doctor', perks: [] },
+  { name: 'Senior Doctor', short: 'Senior', perks: ['Patients pay 25% more.', 'More patients show up with two problems.', 'Everything moves a little faster.'] },
+  { name: 'Head of the Ward', short: 'Head', perks: ['A hospital inspector watches one patient every day. Three stars earns a bonus. A lawsuit costs extra.'] },
+  { name: 'Chief of Medicine', short: 'Chief', perks: ['Emergencies: some patients need a tool picked before the timer runs out.'] },
+  { name: 'Hospital Director', short: 'Director', perks: ['Six patients a day.', 'Two emergencies a day.'] },
+  { name: 'Legend of Medicine', short: 'Legend', perks: ['A special patient every single day.'] },
 ];
 const COATS = ['#ffffff', '#ff8a2a', '#3a86ff', '#ff5d8f', '#2ec4b6', '#1d2b36', '#9b5de5'];
 const coatList = () => M.profile.secrets.konami ? [...COATS, '#d4af37'] : COATS;
+const rankOf = () => Math.min(RANKS.length - 1, state.rank || 0);
+const maxLvl = () => 3 + rankOf();
+function costFor(u, lvl) {
+  if (lvl < u.costs.length) return u.costs[lvl];
+  return Math.round(u.costs[u.costs.length - 1] * Math.pow(1.45, lvl - u.costs.length + 1) * (1 + 0.1 * rankOf()) / 10) * 10;
+}
+const allMaxed = () => UPGRADES.every(u => (state.upgrades[u.id] || 0) >= maxLvl());
+const canPromote = () => allMaxed() && rankOf() < RANKS.length - 1;
+G.ranks = RANKS;
 
-function shop() {
+async function promote() {
+  state.rank = rankOf() + 1;
+  const r = RANKS[state.rank];
+  writeSave();
+  M.unlock('promoted');
+  if (state.rank >= 4) M.unlock('director');
+  if (state.rank >= RANKS.length - 1) M.unlock('legend');
+  music.sting('promotion');
+  await ui.card({
+    icon: M.icon('medal:1'),
+    cls: 'promo-card',
+    title: 'PROMOTED!',
+    html: `<p class="promo-rank">${r.name}</p><p>The hospital board noticed you bought every single upgrade. They were impressed. Also a little worried.</p>
+      <ul class="perks">${r.perks.map(x => `<li>${x}</li>`).join('')}<li>Every upgrade can go one level higher now.</li><li>The job gets harder from here.</li></ul>`,
+    buttons: [{ label: 'Let\'s go!', value: true }],
+  });
+  await nursePanel(pick([`Congratulations, ${r.short}. I'll get you a bigger clipboard.`, `${r.name}? Wow. I've worked here eleven years and I'm still "Nurse."`, 'Promoted. Great. Now the patients will expect you to know things.']), { button: 'Thanks, Pat' });
+}
+
+async function shop() {
+  await M.claimGifts();
+  if (canPromote()) await promote();
   return new Promise(res => {
     const modal = ui.modalEl;
     const render = () => {
@@ -699,23 +836,29 @@ function shop() {
       const card = h('div', 'card shop-card');
       card.appendChild(h('div', 'card-icon', M.icon('cart')));
       card.appendChild(h('div', 'card-title', 'Upgrade Shop'));
+      card.appendChild(h('div', 'shop-rank', `${M.icon('medal:' + Math.min(3, Math.max(1, 4 - rankOf())), 'in')} <b>${RANKS[rankOf()].name}</b>${rankOf() < RANKS.length - 1 ? `<span>Max out every upgrade to get promoted.</span>` : '<span>Top of the hospital. Nowhere left to climb.</span>'}`));
       card.appendChild(h('div', 'shop-bank', `Bank: <b class="${state.money < 0 ? 'neg' : 'pos'}">${fmt(state.money)}</b>`));
       const list = h('div', 'shop-list');
+      const top = maxLvl();
       for (const u of UPGRADES) {
         const lvl = state.upgrades[u.id] || 0;
-        const cost = u.costs[lvl];
+        const cost = lvl < top ? costFor(u, lvl) : undefined;
         const row = h('div', 'shop-row');
-        row.innerHTML = `<div class="shop-icon">${M.icon(u.icon)}</div><div class="shop-info"><b>${u.name}</b><span>${u.desc}</span><div class="dots">${[0, 1, 2].map(i => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div></div>`;
+        row.innerHTML = `<div class="shop-icon">${M.icon(u.icon)}</div><div class="shop-info"><b>${u.name}</b><span>${u.desc}</span><div class="dots">${Array.from({ length: top }, (_, i) => `<i class="${i < lvl ? 'on' : ''}"></i>`).join('')}</div></div>`;
         const b = h('button', 'btn small ' + (cost !== undefined && state.money >= cost ? 'primary' : ''), cost === undefined ? 'MAX' : fmt(cost));
         b.disabled = cost === undefined || state.money < cost;
-        b.onclick = () => { state.money -= cost; state.upgrades[u.id] = lvl + 1; sfx.cash(); ui.setHUD({ money: state.money }); writeSave(); M.checkState(state); render(); };
+        b.onclick = async () => {
+          state.money -= cost; state.upgrades[u.id] = lvl + 1; sfx.cash(); ui.setHUD({ money: state.money }); writeSave(); M.checkState(state);
+          if (canPromote()) { modal.classList.add('hidden'); await promote(); }
+          render();
+        };
         row.appendChild(b);
         list.appendChild(row);
       }
       // coats
       const crow = h('div', 'shop-row');
       if (!state.upgrades.coats) {
-        crow.innerHTML = `<div class="shop-icon">${M.icon('coat')}</div><div class="shop-info"><b>Fancy Coats</b><span>Unlock coat colors for your doctor (shows in chases).</span></div>`;
+        crow.innerHTML = `<div class="shop-icon">${M.icon('coat')}</div><div class="shop-info"><b>Fancy Coats</b><span>Unlock coat colors for your doctor.</span></div>`;
         const b = h('button', 'btn small ' + (state.money >= 100 ? 'primary' : ''), '$100');
         b.disabled = state.money < 100;
         b.onclick = () => { state.money -= 100; state.upgrades.coats = 1; sfx.cash(); ui.setHUD({ money: state.money }); writeSave(); render(); };
@@ -736,6 +879,16 @@ function shop() {
     };
     render();
   });
+}
+
+// Gifts sent from the creator's admin panel.
+function applyGift(g) {
+  if (g.money) { state.money += g.money; ui.setHUD({ money: state.money }); }
+  if (g.upgrades === 'max') { for (const u of UPGRADES) state.upgrades[u.id] = Math.max(state.upgrades[u.id] || 0, maxLvl()); state.upgrades.coats = 1; }
+  else if (g.upgrades) for (const u of UPGRADES) if (g.upgrades[u.id]) state.upgrades[u.id] = Math.min(maxLvl(), (state.upgrades[u.id] || 0) + g.upgrades[u.id]);
+  writeSave();
+  M.checkState(state);
+  return { names: g.upgrades === 'max' ? ['every upgrade maxed out'] : g.upgrades ? UPGRADES.filter(u => g.upgrades[u.id]).map(u => `${u.name} +${g.upgrades[u.id]}`) : [] };
 }
 
 // ---------------- title ----------------
@@ -759,7 +912,7 @@ function startTitleScene() {
 function stopTitleScene() {
   if (titleOff) titleOff();
   titleOff = null;
-  if (demo) { E.scene.remove(demo.root); disposeObj(demo.root); demo = null; }
+  if (demo) { E.scene.remove(demo.root); disposeObj(demo.root); demo.dispose(); demo = null; }
 }
 
 const TAGLINES = [
@@ -820,7 +973,7 @@ function showTitle() {
       mbtn(M.icon('trophy'), 'Awards', () => M.openAchievements());
       mbtn(M.icon('chart'), 'Leaders', () => M.openLeaderboard());
       mbtn(M.icon('user'), M.auth.username ? M.auth.username : 'Account', () => M.openAccount());
-      if (M.isCreator()) mbtn(M.icon('book'), 'Secrets', () => M.openGuide(), 'creator');
+      if (M.isCreator()) { mbtn(M.icon('book'), 'Secrets', () => M.openGuide(), 'creator'); mbtn(M.icon('shield'), 'Admin', () => M.openAdmin(), 'creator'); }
       if (window.matchMedia('(pointer: coarse)').matches && !M.isFullscreen()) mbtn(M.icon('fullscreen'), 'Full screen', () => M.goFullscreen());
     };
     renderMenu();
@@ -926,7 +1079,7 @@ function backfillEarned() {
 }
 
 async function main() {
-  window.addEventListener('pointerdown', () => { sfx.unlock(); if (!sfx.muted) music.play('clinic'); }, { once: true });
+  window.addEventListener('pointerdown', () => { sfx.unlock(); unlockSpeech(); if (!sfx.muted && !music.current) music.play('title'); }, { once: true });
   backfillEarned();
   M.checkState(state);
   startTitleScene();

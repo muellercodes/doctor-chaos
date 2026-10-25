@@ -24,9 +24,11 @@ const SKIN = ['#ffe0c4', '#f9d0b0', '#f1c27d', '#e0ac69', '#c68642', '#a0662e', 
 const HAIR = ['#2b1d14', '#3b2a20', '#6d4c2f', '#a0522d', '#d4a017', '#e8c170', '#1d1d1d', '#b5651d'];
 const HAIR_OLD = ['#e0e0e0', '#bdbdbd', '#f5f5f5', '#9e9e9e'];
 const HAIR_FUN = ['#ff5d8f', '#3ec1d3', '#9b5de5', '#06d6a0'];
-const SHIRTS = ['#4ea8de', '#ff8a2a', '#06d6a0', '#ef476f', '#ffd166', '#9b5de5', '#118ab2', '#f15bb5', '#8ac926', '#ff595e', '#2ec4b6', '#e76f51'];
-const PANTS = ['#3d5a80', '#264653', '#6d597a', '#2b2d42', '#7f5539', '#495057', '#5e548e'];
-const SHOES = ['#1d2b36', '#ffffff', '#e63946', '#3a86ff', '#6d4c2f', '#ffbe0b'];
+// everyday clothing colors (a few brighter ones still show up on kids)
+const SHIRTS = ['#2f4b7c', '#8a9bb0', '#b23a48', '#3e6b5a', '#d9d4c7', '#5b6770', '#c96f3b', '#4f6d9a', '#7a4e6e', '#e8e4da', '#3a3f47', '#a88f5c', '#6b8f71', '#c9a227'];
+const KID_SHIRTS = ['#3a86ff', '#ff8a2a', '#e63946', '#2ec4b6', '#ffd166', '#9b5de5', '#8ac926'];
+const PANTS = ['#3d5a80', '#2b4a6f', '#34495e', '#2b2d42', '#7f6a4f', '#495057', '#5c4b3b', '#3b5998', '#bfae8e'];
+const SHOES = ['#1d2b36', '#f2f2f2', '#6d4c2f', '#3a3a3a', '#8b5a2b', '#c0392b'];
 
 const NAMES = {
   m: { kid: ['Max', 'Leo', 'Noah', 'Sam', 'Jayden', 'Kai', 'Mateo', 'Ollie', 'Finn', 'Arjun', 'Ezra', 'Malik'], teen: ['Tyler', 'Marcus', 'Diego', 'Ethan', 'Jamal', 'Kenji', 'Liam', 'Omar'], adult: ['Dave', 'Raj', 'Luis', 'Gary', 'Steve', 'Brian', 'Darnell', 'Felix', 'Hank', 'Chen', 'Ivan', 'Pedro', 'Theo'], elder: ['Harold', 'Bernard', 'Walter', 'Earl', 'Frank', 'Herbert', 'Morris', 'Gus'] },
@@ -40,12 +42,12 @@ const EYES = ['#5a3a22', '#5a3a22', '#3b2416', '#3b2416', '#8e7240', '#4f7f4f', 
 const PRINT_COLORS = ['#ffffff', '#ffd23f', '#1d2b36', '#ff5d8f', '#7fdbff'];
 export function randomLook(ageGroup, gender) {
   const old = ageGroup === 'elder', kid = ageGroup === 'kid', teen = ageGroup === 'teen';
-  const hairC = old ? pick(HAIR_OLD) : (teen && Math.random() < 0.2 ? pick(HAIR_FUN) : pick(HAIR));
+  const hairC = old ? pick(HAIR_OLD) : (teen && Math.random() < 0.08 ? pick(HAIR_FUN) : pick(HAIR));
   let style;
   if (gender === 'm') style = old ? pick(['bald', 'bald', 'short', 'buzz']) : pick(['short', 'short', 'buzz', 'spiky', 'curly', 'afro', 'slick']);
   else style = old ? pick(['bun', 'short', 'curly', 'bob']) : kid ? pick(['pigtails', 'ponytail', 'long', 'bob', 'curly', 'afro', 'bun']) : pick(['long', 'ponytail', 'bun', 'bob', 'curly', 'afro']);
   const shirtStyle = kid ? pick(['tee', 'tee', 'tee', 'hoodie']) : teen ? pick(['tee', 'tee', 'hoodie', 'hoodie', 'polo']) : old ? pick(['button', 'sweater', 'polo', 'sweater']) : pick(['tee', 'polo', 'button', 'sweater', 'hoodie']);
-  const shirt = pick(SHIRTS);
+  const shirt = kid && Math.random() < 0.6 ? pick(KID_SHIRTS) : pick(SHIRTS);
   const print = (kid || teen) && shirtStyle === 'tee' && Math.random() < 0.65 ? pick(['star', 'heart', 'bolt', 'smile', 'planet', 'paw', 'dino']) : null;
   return {
     age: ageGroup, gender,
@@ -147,7 +149,82 @@ export const BYE = {
   happy: ['Bye, doc! See you never! In a good way!', 'Thanks, doctor! You rock!', 'Bye! I will tell everyone you are great!', 'See ya! Not too soon, hopefully.', 'Bye, Nurse Pat! Bye, doctor!', 'Thank you! I feel amazing. Mostly.'],
   sad: ['Hmph. Goodbye.', 'I want my lollipop back. Oh wait, I never got one.', 'Bye. My lawyer will text you.', 'I am never coming back. Unless I get hurt again.', 'Well. That happened.'],
 };
-export const PICKLES_LINES = ["Psst. Doc. The secret code is PICKLES. Dave told me. Don't tell Dave I told you.", 'Hey, do you know the code PICKLES? Some guy named Dave keeps whispering it in the waiting room.'];
+// Goodbyes are built from a big pile of pieces so patients almost never say the same thing twice.
+const BYE_WHOLE = {
+  great: [
+    'That was the best doctor visit of my whole life. And I once got a sticker shaped like a taco.',
+    'Five stars. Six if they let me.', 'I am telling my whole class about you. Even the hamster.',
+    'You are like a superhero, but with a clipboard.', 'Thank you, doctor! I feel like a brand new person. A slightly sticky one.',
+    'I came in limping and now I am skipping. Watch! Okay, I tripped. Still counts.',
+    'Can I come back tomorrow just to hang out?', 'My grandma is going to bake you a pie. Probably. She makes a lot of pies.',
+    'I did not even cry. Okay, one tear. A brave tear.', 'That did not hurt at all. I was very ready to be mad about it, too.',
+    'You fixed me so fast I forgot why I came in.', 'Nurse Pat, you can keep this doctor.',
+    'Ten out of ten. Would get hurt again. Not on purpose.', 'I am going to name my goldfish after you.',
+    'Best. Doctor. EVER. Bye!', 'I feel so good I might do a cartwheel in the parking lot.',
+    'Thanks! I promise to stop doing whatever caused this. Probably.', 'That was smooth. Like butter. Like medical butter.',
+  ],
+  good: [
+    'Thanks, doc. Pretty good! A little wobbly, but good.', 'Not bad! I would give you a solid B plus.',
+    'I feel better. Mostly. Like, eighty percent better.', 'Okay, that was fine. I was expecting way worse.',
+    'Thank you! I will try to stay out of trouble. No promises.', 'Good job, doc. You only made me nervous twice.',
+    'Bye! I am going to go tell my mom I was brave.', 'That worked! I think. I will let you know if anything falls off.',
+    'Thanks! See you at my next weird injury.', 'Okay, bye! Tell Nurse Pat she has a nice clipboard.',
+    'Pretty good visit. The waiting room magazines were from 1987, though.', 'I am leaving happy. Ish. Happy-ish.',
+  ],
+  meh: [
+    'Well, I am... fixed. Kind of.', 'That was a lot. I need a juice box.', 'I think you got it. Maybe. Bye?',
+    'I am going to go home and lie down for a week.', 'Thanks, I guess. My arm feels confused.',
+    'Not your best work, doc. Not your worst either. Probably.', 'I will be leaving a review. A medium one.',
+    'Okay. I am walking out. Slowly. Carefully. Like a cat on ice.',
+  ],
+  sad: [
+    'Hmph. Goodbye.', 'I want my lollipop back. Oh wait, I never got one.', 'Bye. My lawyer will text you.',
+    'I am never coming back. Unless I get hurt again. Then I am coming back angry.', 'Well. That happened.',
+    'I am going to a different clinic. One with a real doctor.', 'My mom is going to hear about this. LOUDLY.',
+    'Ow. Ow. Ow. That is all I have to say. Ow.', 'You are lucky I am too sore to stomp out of here.',
+    'I came in with one problem and I am leaving with three.', 'Zero stars. Can I give negative stars?',
+    'I am telling the whole internet about this.', 'I would slam the door, but my arm hurts too much.',
+  ],
+};
+const BYE_OPEN = {
+  great: ['Wow, doctor!', 'Thank you SO much!', 'You are amazing!', 'Okay, that was awesome.', 'Doctor, you are a genius.', 'Whoa.', 'Bye, doc!', 'Thanks a million!', 'High five, doctor!', 'Woohoo!', 'You did it!', 'That was incredible.'],
+  good: ['Thanks, doc.', 'Okay, bye!', 'Alright!', 'Not bad, doctor.', 'Well, thanks!', 'See you later!', 'Cool, thanks.', 'Bye now!'],
+  meh: ['Um. Okay.', 'Well...', 'Huh.', 'Alright, I guess.', 'So... thanks?', 'Okay then.'],
+  sad: ['Ugh.', 'Hmph!', 'Well, THAT was terrible.', 'Seriously?', 'Unbelievable.', 'Great. Just great.', 'Wow. Wow.'],
+};
+const BYE_CLOSE = {
+  great: ['I feel like a million bucks.', 'I am going to brag about you all week.', 'Can I have a sticker for the road?', 'I am going straight to the ice cream shop to celebrate.', 'You should be on TV.', 'I barely felt a thing.', 'Nurse Pat, give this doctor a raise.', 'I am going to draw you a picture.', 'My dog is going to be so proud of me.', 'I will tell everyone in the waiting room you are the best.', 'See you never! In a good way!', 'I feel like I could run a marathon. A short one.', 'Even my socks feel better.', 'This is the happiest I have been since pizza day.'],
+  good: ['I feel a lot better.', 'I think I will live.', 'That was not so bad after all.', 'I am going to go eat a snack.', 'Hope I do not see you too soon.', 'My mom owes me a treat now.', 'I will be careful from now on. Maybe.', 'Time for a nap.', 'I am off to tell my cat everything.'],
+  meh: ['I am going to need a minute.', 'Is it supposed to feel like that?', 'I will just walk it off.', 'I am going to ask my mom about this.', 'Something still feels wiggly.', 'I need to sit in the car for a while.'],
+  sad: ['I am calling my lawyer.', 'Do not EVER call me again.', 'I am telling everyone.', 'I want a refund. And a lollipop.', 'This is going in my diary.', 'I hope your stethoscope gets tangled.', 'My grandma is going to write a very strongly worded letter.', 'I am never getting hurt again just to avoid you.'],
+};
+const BYE_KID = { great: ['Can I have TWO stickers?', 'I am going to tell my teacher I was the bravest kid ever.', 'Wait till my friends see this!'], sad: ['I am telling my MOM!', 'You are not invited to my birthday party.', 'I am going to cry in the car. A lot.'] };
+const BYE_ELDER = { great: ['Back in my day, doctors were not this nice. Or this young.', 'I am going to tell everyone at bingo about you.', 'You remind me of my old doctor. He was a good egg.'], sad: ['In my day we just rubbed some dirt on it.', 'I have been to sixty years of doctors and you are the worst.', 'I am going to tell everyone at the senior center.'] };
+const BYE_STEP = {
+  removal: ['Thanks for getting that thing out!', 'I am never putting anything in there again. Probably.'], shot: ['That shot was not even that bad!', 'I am immune to everything now. Right?'],
+  blood: ['I have so much less blood now. It feels light.', 'Do I get a cookie? Blood people get cookies.'], surgery: ['I have a cool scar story now!', 'Did you leave anything in there? Just checking.'],
+  reflex: ['My knee is still a little jumpy.', 'I did not know my leg could do that!'], steth: ['My heart says thank you. I heard it.', 'Did you hear my heart? It likes you.'],
+  cast: ['Everyone is going to sign my cast!', 'This cast is so cool. I am never taking it off.'], thermo: ['At least now I know my temperature.', 'I will drink lots of water. Promise.'],
+  bp: ['My arm finally stopped being squeezed!', 'My blood pressure is a number now. Cool.'], otoscope: ['I can hear EVERYTHING now. Even your stomach.', 'My ear feels so empty and clean!'],
+  drops: ['I can see so much better! Hi! I can see you!', 'My eyes are so fresh right now.'], bandage: ['I love this bandage. It is my favorite bandage.', 'Do not touch my bandage. It is perfect.'],
+  xray: ['Can I keep the X-ray picture for my fridge?', 'I saw my own skeleton! So spooky!'],
+};
+// mood: 'great' | 'good' | 'meh' | 'sad'; recent: Set of lines said lately (kept by the caller)
+export function goodbye(c, mood, recent = new Set()) {
+  const age = c.ageGroup;
+  for (let tries = 0; tries < 30; tries++) {
+    let line;
+    const r = Math.random();
+    if (r < 0.3) line = pick(BYE_WHOLE[mood]);
+    else if (r < 0.45 && (mood === 'great' || mood === 'good') && c.steps && c.steps.length) line = pick(BYE_OPEN[mood]) + ' ' + pick(BYE_STEP[pick(c.steps)] || BYE_CLOSE[mood]);
+    else if (r < 0.55 && age === 'kid' && BYE_KID[mood === 'good' ? 'great' : mood]) line = pick(BYE_OPEN[mood]) + ' ' + pick(BYE_KID[mood === 'good' ? 'great' : mood]);
+    else if (r < 0.62 && age === 'elder' && BYE_ELDER[mood === 'good' ? 'great' : mood]) line = pick(BYE_OPEN[mood]) + ' ' + pick(BYE_ELDER[mood === 'good' ? 'great' : mood]);
+    else line = pick(BYE_OPEN[mood]) + ' ' + pick(BYE_CLOSE[mood]);
+    if (!recent.has(line) || tries === 29) return line;
+  }
+  return pick(BYE_WHOLE[mood]);
+}
+export const PICKLES_LINES = ["Psst. Doc. Want a secret code? It's the last name of the very first patient you ever treated. Don't tell him I told you.", 'Some guy in the waiting room keeps whispering a secret code. He says it is his last name. He was your first patient, I think?']
 
 export const LAWSUIT = {
   removal: 'The {obj} is still in my {where}. I can hear it. It is laughing at me.',
@@ -425,16 +502,20 @@ const ALL_STEPS = ['removal', 'shot', 'blood', 'surgery', 'reflex', 'steth', 'ca
 // opts.persona: which funny character visits today (or null)
 export function generateDay(day, opts = {}) {
   const used = opts.used || new Set();
-  const ages = shuffle(['kid', 'adult', pick(['teen', 'elder']), pick(['kid', 'adult', 'elder']), pick(['adult', 'teen', 'kid'])]);
-  const genders = shuffle(['m', 'f', 'm', 'f', pick(['m', 'f'])]);
-  const slots = [null, null, null, null, null];
-  const free = shuffle([1, 2, 3, 4]);
+  const rank = opts.rank || 0;
+  const n = rank >= 4 ? 6 : 5;
+  const ages = shuffle(['kid', 'adult', pick(['teen', 'elder']), pick(['kid', 'adult', 'elder']), pick(['adult', 'teen', 'kid']), pick(['adult', 'elder', 'kid'])]).slice(0, n);
+  const genders = shuffle(['m', 'f', 'm', 'f', pick(['m', 'f']), pick(['m', 'f'])]).slice(0, n);
+  const slots = new Array(n).fill(null);
+  const free = shuffle([...Array(n - 1).keys()].map(i => i + 1));
   if (opts.special) slots[free.pop()] = { type: 'special', s: opts.special };
   if (opts.persona) slots[free.pop()] = { type: 'persona', p: opts.persona };
   const steps = shuffle(ALL_STEPS);
   const out = [];
   let si = 0;
-  for (let i = 0; i < 5; i++) {
+  // promoted doctors see more patients with two problems at once
+  const twoChance = Math.min(0.7, 0.3 + 0.1 * rank);
+  for (let i = 0; i < n; i++) {
     const slot = slots[i];
     const ag = ages[i], g = genders[i];
     let c;
@@ -444,7 +525,7 @@ export function generateDay(day, opts = {}) {
       let st = steps[si++ % steps.length];
       if (day === 1 && i === 0) st = pick(['removal', 'shot', 'cast']);
       c = normalPatient(ag, g, st, used);
-      if (day >= 3 && Math.random() < 0.3) {
+      if ((day >= 3 || rank > 0) && Math.random() < twoChance) {
         const extra = pick(ALL_STEPS.filter(x => x !== st && x !== 'surgery'));
         const more = addStep(c, extra, used);
         c.complaint += ' ' + more.replace(/^I /, 'Also, I ').replace(/^My /, 'Also, my ');

@@ -4,7 +4,8 @@
 import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'obscenity';
 import { GUIDE } from '../../lib/guide.js';
 
-const GUIDE_USER = 'Creater'; // exact spelling and capitals
+const GUIDE_USER = 'Creater'; // exact spelling and capitals (the guide and the admin panel)
+const UPGRADE_IDS = ['steady', 'lawyer', 'shoes', 'lolli', 'coats'];
 
 const ALLOWED_ORIGINS = ['https://muellercodes.github.io', 'https://doctor-chaos.pages.dev'];
 const ITER = 20000; // PBKDF2 rounds (kept modest so it fits the free plan's CPU limit)
@@ -74,7 +75,7 @@ async function currentUser(req, env) {
   if (!s) return null;
   if (s.last_seen < now() - SESSION_DAYS * 864e5) { await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(th).run(); return null; }
   if (s.last_seen < now() - 36e5) await env.DB.prepare('UPDATE sessions SET last_seen = ? WHERE token_hash = ?').bind(now(), th).run();
-  const u = await env.DB.prepare('SELECT id, username, money, days, earned, save, updated_at FROM users WHERE id = ?').bind(s.user_id).first();
+  const u = await env.DB.prepare('SELECT id, username, money, days, earned, gifted, save, updated_at FROM users WHERE id = ?').bind(s.user_id).first();
   return u ? { ...u, tokenHash: th } : null;
 }
 
@@ -153,7 +154,7 @@ export async function onRequest(context) {
       return json(req, { username: user.username, money: user.money, days: user.days, earned: user.earned, save, guide: user.username === GUIDE_USER });
     }
     if (route === 'me' && req.method === 'DELETE') {
-      await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id)]);
+      await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id), env.DB.prepare('DELETE FROM gifts WHERE user_id = ?').bind(user.id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(user.id)]);
       return json(req, { ok: true });
     }
     if (route === 'logout' && req.method === 'POST') {
@@ -166,13 +167,49 @@ export async function onRequest(context) {
       if (await limited(env, 'save:' + user.id, 240, 36e5)) return json(req, { ok: true, skipped: true });
       // days played only goes up; money is sanity-capped so the board stays believable
       const days = Math.max(user.days, clampInt(b.days, 0, 100000));
-      const money = clampInt(b.money, -1000000, 60000 + days * 15000);
+      const money = clampInt(b.money, -1000000, 60000 + days * 15000 + (user.gifted || 0));
       // total earned only goes up, with a generous cap per day played
       const earned = Math.max(user.earned || 0, clampInt(b.earned, 0, 100000 + days * 20000));
       const save = b.save ? JSON.stringify(b.save) : null;
       if (save && save.length > 150000) return fail(req, 'Save is too big.');
       await env.DB.prepare('UPDATE users SET money = ?, days = ?, earned = ?, save = COALESCE(?, save), updated_at = ? WHERE id = ?').bind(money, days, earned, save, now(), user.id).run();
       return json(req, { ok: true, money, days, earned });
+    }
+    // ---- gifts waiting for this player (sent from the admin panel); claiming them marks them used ----
+    if (route === 'gifts' && req.method === 'POST') {
+      const { results } = await env.DB.prepare('UPDATE gifts SET claimed_at = ? WHERE user_id = ? AND claimed_at IS NULL RETURNING id, money, upgrades, from_name, created_at').bind(now(), user.id).all();
+      const gifts = (results || []).map(g => { let up = null; try { up = g.upgrades ? JSON.parse(g.upgrades) : null; } catch (e) { up = null; } return { money: g.money, upgrades: up, from: g.from_name, at: g.created_at }; });
+      return json(req, { gifts });
+    }
+    // ---- admin panel: only the account named exactly Creater ----
+    if (route.startsWith('admin/')) {
+      if (user.username !== GUIDE_USER) return fail(req, 'Only the creator can do that.', 403);
+      if (route === 'admin/users' && req.method === 'GET') {
+        const { results } = await env.DB.prepare('SELECT username, days, money, earned, updated_at FROM users ORDER BY uname_lc ASC LIMIT 500').all();
+        return json(req, { users: results || [] });
+      }
+      if (route === 'admin/gift' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (!b) return fail(req, 'Bad request.');
+        if (await limited(env, 'gift:' + user.id, 300, 36e5)) return fail(req, 'Slow down a little. Try again in a bit.', 429);
+        const to = await env.DB.prepare('SELECT id, username FROM users WHERE uname_lc = ?').bind(String(b.to || '').trim().toLowerCase()).first();
+        if (!to) return fail(req, 'No player has that name.', 404);
+        const money = clampInt(b.money, 0, 1000000);
+        let upgrades = null;
+        if (b.upgrades === 'max') upgrades = 'max';
+        else if (b.upgrades && typeof b.upgrades === 'object') {
+          upgrades = {};
+          for (const id of UPGRADE_IDS) { const n = clampInt(b.upgrades[id], 0, 10); if (n) upgrades[id] = n; }
+          if (!Object.keys(upgrades).length) upgrades = null;
+        }
+        if (!money && !upgrades) return fail(req, 'Pick some money or an upgrade to send.');
+        await env.DB.batch([
+          env.DB.prepare('INSERT INTO gifts (user_id, money, upgrades, from_name, created_at) VALUES (?, ?, ?, ?, ?)').bind(to.id, money, upgrades ? JSON.stringify(upgrades) : null, user.username, now()),
+          env.DB.prepare('UPDATE users SET gifted = gifted + ? WHERE id = ?').bind(money, to.id),
+        ]);
+        return json(req, { ok: true, to: to.username, money, upgrades });
+      }
+      return fail(req, 'Not found.', 404);
     }
     if (route === 'guide' && req.method === 'GET') {
       if (user.username !== GUIDE_USER) return fail(req, 'Nice try. This is only for the creator.', 403);
