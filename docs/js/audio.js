@@ -68,6 +68,7 @@ function noise({ dur = 0.3, vol = 0.3, freq = 1200, q = 1, type = 'bandpass', sl
 export const sfx = {
   unlock() { const c = ensure(); if (c && c.state === 'suspended') c.resume(); },
   get muted() { return muted; },
+  get vol() { return sfxVol; },
   setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; },
   setVolumes(sv, mv) { sfxVol = sv; musicVol = mv; if (sfxBus) sfxBus.gain.value = sv; if (musicGain) musicGain.gain.value = 0.3 * mv; },
   set pitch(v) { pitchMul = v; },

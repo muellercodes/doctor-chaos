@@ -45,7 +45,7 @@ At the 100th promotion the hospital turns into Doctor Burger. The exam room beco
 
 Days get a little harder as you go and the clinic has bills to pay at the end of each day. Progress saves after every patient, and the pause button has an option to go back to the main menu without losing anything. There are 70 achievements, from normal ones to completely absurd ones, and a settings screen (volumes, patient voices, talking speed, graphics, screen shake, bigger text, full screen).
 
-Patients talk out loud with a steady voice each, and the voice changes with how they feel (scared, angry, happy, sleepy). They talk about what they came in for and react to what you are doing to them, make faces that match, and almost never say the same goodbye twice. Speech bubbles move up to a corner while you work, and a tap skips a line. The game can play recorded voice files from `docs/voice/` when they exist and falls back to the device's own text-to-speech. The music changes with what is going on.
+Patients talk out loud with a steady voice each, and the voice changes with how they feel (scared, angry, happy, sleepy). They talk about what they came in for and react to what you are doing to them, make faces that match, and almost never say the same goodbye twice. Speech bubbles move up to a corner while you work, and a tap skips a line. The voices are recorded ahead of time with Kokoro, a free open-source voice model, so they sound the same on every phone and computer: one voice for each kind of person (kids, teens, grown-ups, grandparents, Nurse Pat), with the mood changing the pitch and pace. A line that has no recording yet uses the device's own text-to-speech. The music changes with what is going on.
 
 Dragging is mistake-proof: a drag that ends on a button does not click it, and new buttons ignore taps for a moment after they appear.
 
@@ -87,7 +87,8 @@ docs/            the whole site (served as-is)
   js/meta.js     settings, achievements, secret codes, accounts, leaderboards
   js/excuses.js  the pool of injury excuses (each one is used once per save)
   js/games/      one file per mini-game (food.js has the five kitchen games)
-  voice/         optional recorded voice lines plus manifest.json
+  voice/         recorded lines, one MP3 per sentence per voice, plus manifest.json
+tools/voice/     scripts that find every line in the game and record it
 ```
 
 Run locally with any static server (accounts won't work, everything else will):
@@ -111,6 +112,20 @@ wrangler.toml                Cloudflare config, including the database binding
 ```
 
 Debug shortcut: `index.html?test=surgery` (or `removal`, `shot`, `blood`, `appendix`, `swallowed`, `reflex`, `steth`, `cast`, `thermo`, `bp`, `otoscope`, `drops`, `bandage`, `xray`, `runner`, `baby`, `sneezy`, `hider`, `scooter`, `germs`, `triplets`, `lightsout`, and the kitchen games `grill`, `fryer`, `soda`, `sundae`, `assemble`) jumps straight to one patient. Add `&rank=37` to start at a given job. `index.html?lineup` shows a row of random patients (`?lineup=expr` with faces). Test pages stay silent (no voices).
+
+### Recording voices
+
+New or changed dialogue needs recording, or those lines use the device voice. Every sentence is recorded once per voice; clips that already exist are skipped.
+
+```
+pip install kokoro-onnx==0.6.1 soundfile        # also needs ffmpeg and Playwright
+# put kokoro-v1.0.onnx and voices-v1.0.bin from
+# github.com/thewh1teagle/kokoro-onnx/releases (model-files-v1.0) in ~/kokoro_models
+cd docs && python3 -m http.server 8765 &        # the harvest runs the game's own modules
+cd .. && python3 tools/voice/static_lines.py && python3 tools/voice/harvest.py
+python3 tools/voice/gen.py                      # slow: about real time on two CPU cores
+python3 tools/voice/manifest.py
+```
 
 ## Hosting
 

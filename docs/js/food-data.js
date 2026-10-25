@@ -33,7 +33,6 @@ function itemText(it) {
   if (it.kind === 'cone') return `a ${it.flavor[0].toLowerCase()} ice cream cone`;
   return 'something';
 }
-const joinList = a => (a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 
 // things customers say while they wait, tied to what they ordered
 export const FOOD_REMARKS = {
@@ -100,7 +99,14 @@ function customer(ageGroup, gender, items) {
     if (it.kind === 'cone') { steps.push('sundae'); params.sundae = { flavor: it.flavor }; }
   }
   const open = pick(ORDER_OPEN[ageGroup]), close = pick(ORDER_CLOSE[ageGroup]);
-  const complaint = `${open} ${joinList(items.map(itemText))}.${close ? ' ' + close : ''}`.replace(/\.\./g, '.').replace(/: a/, ': a');
+  // one item per sentence, so each sentence can have a recorded voice
+  const its = items.map(itemText);
+  const lead = /[.!?]$/.test(open) ? its[0][0].toUpperCase() + its[0].slice(1) : its[0];
+  // "Can I get a burger?" is a question; "I would like a burger." is not
+  const asks = /^(can|could|may)\b/i.test(open.split(/[.!?]\s+/).pop().replace(/^(uh|yeah|hi|hey|so)[, ]+/i, '').trim());
+  let complaint = `${open} ${lead}${asks ? '?' : '.'}`;
+  for (const t of its.slice(1)) complaint += ` And ${t}.`;
+  if (close) complaint += ' ' + close;
   const remarks = shuffle([...items.flatMap(it => FOOD_REMARKS[it.kind === 'cone' ? 'cone' : it.kind] || []), ...FOOD_REMARKS.any]).slice(0, 8);
   return {
     first, name: `${first}`, ageGroup, gender, age, ageLabel: String(age), food: true,

@@ -1,11 +1,12 @@
 // Voices for patients and Nurse Pat.
-// 1) Recorded lines: if docs/voice/manifest.json has a recording of the exact line for this kind of
-//    voice, it plays through Web Audio, nudged in pitch and speed for the speaker's age and mood.
+// 1) Recorded lines: docs/voice/manifest.json lists a recording for each sentence each voice can say.
+//    If every sentence of a line has one, the line plays through Web Audio, one sentence after
+//    another, nudged in pitch and speed for the speaker's age and mood.
 // 2) Otherwise the device's own text-to-speech, using the most natural voice the device has,
 //    with pitch, speed and pauses shaped by the speaker's mood.
 // Either way, nothing here can stall the game: if a voice does not start quickly it is dropped,
 // and every line has a hard time limit.
-import { music } from './audio.js';
+import { music, sfx } from './audio.js';
 
 export const voice = { enabled: true, robot: false, squeaky: false, speed: 1 };
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
@@ -53,6 +54,15 @@ export function speakable(text) {
   t = t.replace(/\b([A-Z]{2,})\b/g, m => (m.length <= 3 && /^(OK|TV|ER|CT|MRI)$/.test(m) ? m : m.toLowerCase())); // shouty caps read better as words
   return /[a-z0-9]/i.test(t) ? t : '';
 }
+// A line is recorded sentence by sentence, so lines built from pieces (goodbyes, two-part complaints)
+// still find their recordings. Returns [{ say, key }] for the parts that have words in them.
+export function pieces(text) {
+  // tags and stage directions go first, so a "(sentence.)" inside parentheses is not cut in half
+  const raw = String(text || '').replace(/<[^>]+>/g, ' ').replace(/\([^)]*\)/g, ' ').split(/(?<=[.!?\u2026])["'\]]*\s+/);
+  const out = [];
+  for (const r of raw) { const say = speakable(r); if (say) out.push({ say, key: lineKey(say) }); }
+  return out;
+}
 // the key a recording is filed under (same rule as the build script)
 export function lineKey(text) {
   const t = speakable(text).toLowerCase().replace(/[^a-z0-9?! ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -84,55 +94,71 @@ const AGE = {
   adultm: { p: 0.9, r: 1.02 }, adultf: { p: 1.08, r: 1.02 }, elderm: { p: 0.78, r: 0.88 }, elderf: { p: 0.95, r: 0.88 },
 };
 const ageKey = who => (who.age === 'adult' || who.age === 'elder' ? who.age + (who.gender === 'f' ? 'f' : 'm') : who.age || 'adultm');
+// recorded voices also tell teen boys and girls apart
+const recKey = who => (who.id === 'nurse-pat' ? 'nurse' : who.age === 'teen' ? 'teen' + (who.gender === 'f' ? 'f' : 'm') : ageKey(who));
 
 // ---------------- recorded lines ----------------
 let manifest = null, manifestP = null, actx = null;
 const bufCache = new Map();
 function loadManifest() {
-  if (!manifestP) manifestP = fetch('voice/manifest.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null).then(m => { manifest = m; return m; });
+  if (!manifestP) manifestP = fetch('voice/manifest.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null).then(m => {
+    // lines: { voiceId: 'key key key' } becomes a Set per voice
+    if (m && m.lines) for (const id of Object.keys(m.lines)) m.lines[id] = new Set(String(m.lines[id]).split(' '));
+    manifest = m; return m;
+  });
   return manifestP;
 }
 if (!QUIET && typeof fetch !== 'undefined') loadManifest();
 // which recorded voice suits this speaker (the manifest lists voices per age and gender)
 function recVoice(who) {
   if (!manifest || !manifest.voices) return null;
-  const k = who.id === 'nurse-pat' ? 'nurse' : ageKey(who);
-  const list = manifest.voices[k] || manifest.voices[who.gender === 'f' ? 'adultf' : 'adultm'];
+  const k = recKey(who);
+  const list = manifest.voices[k] || manifest.voices[ageKey(who)] || manifest.voices[who.gender === 'f' ? 'adultf' : 'adultm'];
   if (!list || !list.length) return null;
   return list[hashStr(who.id || who.name || 'x') % list.length];
 }
-function recUrl(text, who) {
+// every sentence of the line needs a recording in this voice, or the whole line uses the device voice
+function recFor(text, who) {
   const v = recVoice(who); if (!v) return null;
-  const key = lineKey(text);
   const set = manifest.lines && manifest.lines[v.id];
-  if (!set || !set.includes(key)) return null;
-  return { url: `voice/${v.id}/${key}.mp3`, v };
+  if (!set) return null;
+  const parts = pieces(text);
+  if (!parts.length || !parts.every(p => set.has(p.key))) return null;
+  return { urls: parts.map(p => `voice/${v.id}/${p.key}.mp3`), v };
+}
+async function loadClip(url) {
+  let buf = bufCache.get(url);
+  if (buf) return buf;
+  const res = await fetch(url).catch(() => null);
+  if (!res || !res.ok) return null;
+  buf = await actx.decodeAudioData(await res.arrayBuffer()).catch(() => null);
+  if (!buf) return null;
+  if (bufCache.size > 120) bufCache.delete(bufCache.keys().next().value);
+  bufCache.set(url, buf);
+  return buf;
 }
 async function playRecorded(rec, who, mood, entry) {
   if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false; actx = new AC(); }
   if (actx.state === 'suspended') { try { await actx.resume(); } catch (e) { /* ignore */ } }
-  let buf = bufCache.get(rec.url);
-  if (!buf) {
-    const res = await fetch(rec.url).catch(() => null);
-    if (!res || !res.ok) return false;
-    buf = await actx.decodeAudioData(await res.arrayBuffer()).catch(() => null);
-    if (!buf) return false;
-    if (bufCache.size > 80) bufCache.delete(bufCache.keys().next().value);
-    bufCache.set(rec.url, buf);
-  }
+  const bufs = await Promise.all(rec.urls.map(loadClip));
+  if (bufs.some(b => !b)) return false;
   if (entry.finished) return true;
   const m = MOODS[mood] || MOODS.neutral;
-  const src = actx.createBufferSource(); src.buffer = buf;
-  // the recording already sounds like an adult of the right kind; small shifts for age, person and mood
-  const shift = (rec.v.shift || 1) * (who.pitch ? Math.max(0.9, Math.min(1.1, who.pitch)) : 1) * Math.sqrt(m.p * m.r);
-  let rate = shift * (voice.squeaky ? 1.5 : 1) * (voice.robot ? 0.85 : 1);
-  src.playbackRate.value = Math.max(0.6, Math.min(1.8, rate));
-  const g = actx.createGain(); g.gain.value = 1;
-  src.connect(g); g.connect(actx.destination);
-  const dur = buf.duration / src.playbackRate.value;
-  entry.stopFn = () => { try { src.stop(); } catch (e) { /* ignore */ } };
-  src.onended = () => entry.finish();
-  src.start();
+  // the recording already sounds like the right kind of person; small shifts for age, person and mood
+  const shift = (rec.v.shift || 1) * (who.pitch ? 1 + Math.max(-0.06, Math.min(0.06, (who.pitch - 1) * 0.6)) : 1) * Math.sqrt(m.p * m.r);
+  const rate = Math.max(0.6, Math.min(1.8, shift * (voice.squeaky ? 1.5 : 1) * (voice.robot ? 0.85 : 1) * Math.sqrt(voice.speed || 1)));
+  const g = actx.createGain(); g.gain.value = Math.min(1, sfx.vol); g.connect(actx.destination);
+  // sentences back to back, with the mood's pause between them
+  let t = actx.currentTime + 0.02;
+  const srcs = [];
+  bufs.forEach((buf, i) => {
+    const src = actx.createBufferSource(); src.buffer = buf; src.playbackRate.value = rate;
+    src.connect(g); src.start(t); srcs.push(src);
+    t += buf.duration / rate + (i < bufs.length - 1 ? m.gap : 0);
+  });
+  const dur = t - actx.currentTime;
+  entry.stopFn = () => { for (const s of srcs) { try { s.stop(); } catch (e) { /* ignore */ } } };
+  srcs[srcs.length - 1].onended = () => entry.finish();
   entry.started(dur);
   return true;
 }
@@ -162,7 +188,7 @@ function speakDevice(say, who, mood, entry) {
     if (v) { u.voice = v; u.lang = v.lang; }
     u.pitch = Math.max(0, Math.min(2, pitch * ex));
     u.rate = Math.max(0.5, Math.min(1.8, rate * voice.speed * (/!$/.test(s) ? 1.04 : 1)));
-    u.volume = 1;
+    u.volume = Math.min(1, sfx.vol);
     u.onstart = () => { if (!startedOnce) { startedOnce = true; entry.started(say.length / (13 * u.rate) + parts.length * m.gap); } };
     u.onend = () => { if (entry.finished) return; setTimeout(next, m.gap * 1000); };
     u.onerror = () => entry.finish();
@@ -183,10 +209,10 @@ export function stop() {
 // done always resolves: when the line ends, when it is skipped, if the voice never starts (1.2s),
 // or at a hard limit based on the length of the line.
 export function speak(text, who = {}) {
-  if (QUIET || !voice.enabled) return null;
+  if (QUIET || !voice.enabled || sfx.muted) return null;
   const say = speakable(text);
   if (!say) return null;
-  const rec = manifest ? recUrl(text, who) : null;
+  const rec = manifest ? recFor(text, who) : null;
   if (!rec && !canSpeak()) return null;
   stop();
   const mood = who.mood || 'neutral';
@@ -218,7 +244,8 @@ export function speak(text, who = {}) {
   };
   current = entry;
   // a voice that has not started within 1.2 seconds is not going to; move on without it
-  timers[0] = setTimeout(() => { if (!entry.isStarted) entry.finish(); }, 1200);
+  // (recordings get a little longer, since the first play of a line downloads it)
+  timers[0] = setTimeout(() => { if (!entry.isStarted) entry.finish(); }, rec ? 2000 : 1200);
   if (rec) playRecorded(rec, who, mood, entry).then(ok => { if (!ok && !entry.finished) { if (canSpeak()) speakDevice(say, who, mood, entry); else entry.finish(); } });
   else speakDevice(say, who, mood, entry);
   return { done, est: est0, skip: () => entry.finish(), get started() { return !!entry.isStarted; } };

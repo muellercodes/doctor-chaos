@@ -71,7 +71,7 @@ ui.onSeen = () => writeSave();
 sfx.setMuted(!!state.muted); ui.syncMute();
 let muteFlips = [];
 ui.onMute = m => {
-  state.muted = m; writeSave(); if (m) music.stop(); else music.play('clinic');
+  state.muted = m; writeSave(); if (m) { music.stop(); stopSpeech(); } else music.play('clinic');
   const now = Date.now(); muteFlips = muteFlips.filter(t => now - t < 20000); muteFlips.push(now);
   if (muteFlips.length >= 20) M.unlock('sound_toggle');
 };
