@@ -588,3 +588,16 @@ svg.ic.in { width: 1.2em; height: 1.2em; vertical-align: -0.25em; }
 .spk { padding: 8px; margin: -8px; touch-action: manipulation; }
 .tagline, .logo i { -webkit-touch-callout: none; touch-action: manipulation; }
 .logo { touch-action: none; }
+
+/* your job, in the top bar */
+.hud .pill.job { background: #fff8e1; max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) { .hud .pill.job { display: none !important; } }
+/* admin panel: player info, sub labels, on/off pairs */
+.admin-info { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px 12px; font-size: 14px; }
+.admin-info div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed rgba(29,43,54,0.15); padding: 2px 0; }
+.admin-info span { color: #5b6b75; }
+.admin-sub { font-size: 13px; color: #5b6b75; margin: 6px 0 2px; font-weight: 600; }
+.admin-pair { display: inline-flex; gap: 2px; margin: 0 6px 6px 0; }
+.admin-pair .btn:last-child { padding-left: 8px; padding-right: 8px; }
+.admin-select.wide { width: 230px; max-width: 100%; }
+.admin-field input[type="text"]::placeholder { color: #9aa6ad; font-weight: 500; }

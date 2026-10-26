@@ -103,9 +103,10 @@ export function createEngine(canvas) {
   // so the end of a scrub can never turn into an accidental click.
   const input = {
     x: 0, y: 0, cx: 0, cy: 0, has: false, _down: false, stale: false, blockUntil: 0,
+    touch: typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches,
     get down() { return this._down && !this.stale; },
     set down(v) { this._down = v; },
-    requireRelease(ms = 380) { if (this._down) this.stale = true; this.blockUntil = performance.now() + ms; },
+    requireRelease(ms = 200) { if (this._down) this.stale = true; this.blockUntil = performance.now() + ms; },
     listeners: { down: new Set(), up: new Set(), move: new Set() },
     keys: new Set(), keyListeners: new Set(),
   };
@@ -118,7 +119,7 @@ export function createEngine(canvas) {
     input.has = true;
   }
   canvas.addEventListener('pointerdown', e => {
-    setPointer(e); input._down = true;
+    setPointer(e); input._down = true; input.touch = e.pointerType === 'touch' || e.pointerType === 'pen';
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     if (performance.now() < input.blockUntil) { input.stale = true; return; }
     input.stale = false;
@@ -268,6 +269,19 @@ export function createEngine(canvas) {
       add(obj, parent = scene) { parent.add(obj); items.push(() => { if (obj.parent) obj.parent.remove(obj); disposeDeep(obj); }); return obj; },
       update(fn) { const off = onUpdate(fn); items.push(off); return off; },
       on(type, fn) { input.listeners[type].add(fn); items.push(() => input.listeners[type].delete(fn)); },
+      // Aim-then-pick, made for fingers as well as mice. The pick happens when the press ends, at the
+      // spot where it ends, so a finger can see what it is aiming at first.
+      //   'explore': dragging only moves the light around; a tap (press without much movement) picks.
+      //   'aim':     drag into place and let go to pick; a plain tap also picks.
+      pick(fn, mode = 'aim') {
+        let press = null;
+        const slop = 14;
+        const dn = () => { press = { x: input.cx, y: input.cy, far: 0 }; };
+        const mv = () => { if (press) press.far = Math.max(press.far, Math.hypot(input.cx - press.x, input.cy - press.y)); };
+        const upf = () => { const p = press; press = null; if (!p) return; if (mode === 'explore' && p.far > slop) return; fn(); };
+        input.listeners.down.add(dn); input.listeners.move.add(mv); input.listeners.up.add(upf);
+        items.push(() => { input.listeners.down.delete(dn); input.listeners.move.delete(mv); input.listeners.up.delete(upf); });
+      },
       key(fn) { input.keyListeners.add(fn); items.push(() => input.keyListeners.delete(fn)); },
       dom(el) { items.push(() => el.remove()); return el; },
       defer(fn) { items.push(fn); },
@@ -313,6 +327,8 @@ export function createEngine(canvas) {
     THREE, renderer, scene, camera, input, basePos, camTarget,
     tween, onUpdate, wait, until, moveCamera, frame, home, shake,
     pointerOnPlane, pickObjects, toScreen, ray, scope,
+    // true when the player is using a finger (decides wording like "tap" vs "click")
+    get coarse() { return input.touch; },
     get time() { return time; },
     get fps() { return fps; },
     set paused3D(v) { paused3D = v; },

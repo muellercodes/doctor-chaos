@@ -18,7 +18,7 @@ LOG = str(ROOT / 'tools/voice/gen.log')
 # which Kokoro voice records each kind of speaker
 VOICE_OF = {'nurse': 'af_heart', 'kid': 'af_bella', 'teenf': 'af_bella', 'adultf': 'af_bella',
             'teenm': 'am_puck', 'adultm': 'am_michael', 'elderm': 'bm_george', 'elderf': 'bf_emma'}
-ORDER = ['NURSE', 'FOOD_QUIPS', 'tutorial', 'day', 'REMARKS', 'SUCCESS', 'FAIL', 'IMPATIENT', 'WRONG_TOOL', 'PICKLES',
+ORDER = ['NURSE', 'FOOD_QUIPS', 'MANAGER_REMAKE', 'tutorial', 'day', 'REMARKS', 'SUCCESS', 'FAIL', 'IMPATIENT', 'WRONG_TOOL', 'PICKLES',
          'STEP_TALK', 'goodbye', 'static', 'persona', 'special', 'normal', 'EXCUSES', 'TAILS', 'food', 'FOOD', 'foodGoodbye']
 
 

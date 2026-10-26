@@ -5,7 +5,7 @@ import { h } from './ui.js';
 import { icon } from './icons.js';
 export { icon };
 
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 
 const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null') || {}; } catch (e) { return {}; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };
@@ -157,6 +157,7 @@ export const ACHIEVEMENTS = [
   { id: 'promo50', icon: 'trophy', name: 'Halfway to Burgers', desc: 'Get promoted 50 times. Something feels off.' },
   { id: 'legend', icon: 'bigstar', name: 'Chief of Superheroes', desc: 'Reach promotion 99, the top job in medicine.' },
   { id: 'fast_food', icon: 'taco', name: 'Would You Like Fries With That?', desc: 'Get promoted 100 times. Into fast food.' },
+  { id: 'picky_customer', icon: 'scroll', name: 'The Customer Is Always Right', desc: 'Remake an order for a customer who was wrong the whole time.' },
   { id: 'tycoon', icon: 'crown', name: 'Burger Tycoon', desc: 'Reach the very last job in the game.' },
   { id: 'inspector', icon: 'scroll', name: 'Passed Inspection', desc: 'Get 3 stars while the inspector watches.' },
   { id: 'code1', icon: 'lock', name: 'Code Breaker', desc: 'Enter a secret code.' },
@@ -417,7 +418,8 @@ export async function claimGifts() {
     sfx.great();
     const from = r.gifts[0].from || 'the creator';
     const self = from === auth.username;
-    await message({ icon: icon(self ? 'shield' : 'gift'), title: self ? 'Admin changes applied' : `A gift from ${esc(from)}!`, html: `<ul class="gift-list">${lines.join('')}</ul>`, buttons: [{ label: self ? 'OK' : 'Thank you!', value: true, cls: 'primary' }] });
+    const onlyCheers = r.gifts.every(g => g.action && g.action.type === 'cheer');
+    await message({ icon: icon(self ? 'shield' : onlyCheers ? 'sparkle' : 'gift'), title: self ? 'Admin changes applied' : onlyCheers ? `A message from ${esc(from)}` : `A gift from ${esc(from)}!`, html: `<ul class="gift-list">${lines.join('')}</ul>`, buttons: [{ label: self ? 'OK' : 'Thank you!', value: true, cls: 'primary' }] });
     queueSync(true);
   } finally { claiming = false; }
 }
@@ -428,13 +430,19 @@ export function openAdmin(opts = {}) {
   const num = v => { const n = Number(String(v).replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? Math.round(n) : null; };
   const rankName = r => (C ? C.rankInfo(r).title : 'Rank ' + r);
   return panel((card, close) => {
-    let users = [], config = { payBoost: 1, boostUntil: 0 }, filter = '', pick = null, flash = opts.flash || '';
+    let users = [], config = { payBoost: 1, boostUntil: 0, events: {} }, filter = '', pick = null, flash = opts.flash || '';
+    let lists = { cheers: [], visitors: [], cheats: [] }, detail = null, detailFor = null;
+    const VISITOR_NAMES = { runner: 'Runner (hallway chase)', baby: 'Baby', sneezy: 'Sneezer', hider: 'Hider', scooter: 'Scooter thief', germs: 'Germ Blaster kid', triplets: 'Triplets', lightsout: 'Lights Out kid', vampire: 'The Vampire', pirate: 'The Pirate', trench: 'Three kids in a trench coat', mime: 'The Mime', influencer: 'The Influencer', grandma: 'Grandma Bertha', ticklish: 'Ticklish patient', conspiracy: 'Kevin Truthseeker' };
+    const EVENT_NAMES = { party: 'Party Day (party hats)', bighead: 'Big Head Day', cats: 'Cat Day (cat ears)', specials: 'Special Patient Day' };
+    const ago = t => { if (!t) return 'never'; const m = Math.round((Date.now() - t) / 6e4); return m < 2 ? 'just now' : m < 90 ? `${m} minutes ago` : m < 48 * 60 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`; };
     const wantPick = opts.pick || null;
     const send = async (action, okText) => {
       const r = await api('/admin/action', { method: 'POST', authed: true, body: { to: pick.username, action } });
       if (!r.ok) { flash = '<span class="err">' + esc(r.error) + '</span>'; sfx.bad(); render(); return false; }
       sfx.great();
-      flash = esc(okText || 'Done!') + (pick.username === auth.username ? '' : ` ${esc(pick.username)} sees it next time they play.`);
+      const instant = ['password', 'logout', 'pause', 'hide'].includes(action.type);
+      flash = esc(okText || 'Done!') + (pick.username === auth.username || instant ? '' : ` ${esc(pick.username)} sees it next time they play.`);
+      if (!instant) detail = null;
       // keep the list in step with what the boards now show
       const u = users.find(x => x.username === pick.username);
       if (u) {
@@ -447,7 +455,7 @@ export function openAdmin(opts = {}) {
         if (action.type === 'reset') Object.assign(u, { money: 200, days: 0, earned: 0, rank: 0 });
         pick = u;
       }
-      if (pick.username === auth.username) { const keep = flash; close(null); await claimGifts(); openAdmin({ pick: pick.username, flash: keep }); return true; }
+      if (pick.username === auth.username && !instant) { const keep = flash; close(null); await claimGifts(); openAdmin({ pick: pick.username, flash: keep }); return true; }
       render();
       return true;
     };
@@ -474,7 +482,28 @@ export function openAdmin(opts = {}) {
           b.onclick = async () => { sfx.click(); const r = await api('/admin/config', { method: 'POST', authed: true, body: { payBoost: x, hours: hrs } }); if (r.ok) { config = r.config; hooks.onConfig && hooks.onConfig(config); flash = x > 1 ? `${x}x pay is on for everyone.` : 'Event stopped.'; sfx.great(); } else flash = '<span class="err">' + esc(r.error) + '</span>'; render(); };
           evRow.appendChild(b);
         }
-        ev.appendChild(evRow); card.appendChild(ev);
+        ev.appendChild(evRow);
+        // fun events
+        const evs = config.events || {};
+        const funRow = h('div', 'admin-money');
+        for (const k of Object.keys(EVENT_NAMES)) {
+          const live = evs[k] && evs[k] > Date.now();
+          const b = h('button', 'btn small' + (live ? ' primary' : ''), live ? `Stop ${EVENT_NAMES[k]} (${Math.max(1, Math.round((evs[k] - Date.now()) / 6e4))} min left)` : `${EVENT_NAMES[k]}, 1 hour`);
+          b.onclick = async () => { sfx.click(); const r = await api('/admin/config', { method: 'POST', authed: true, body: { event: k, hours: 1, off: live } }); if (r.ok) { config = r.config; hooks.onConfig && hooks.onConfig(config); flash = live ? `${EVENT_NAMES[k]} stopped.` : `${EVENT_NAMES[k]} is on for everyone for an hour.`; sfx.great(); } else flash = '<span class="err">' + esc(r.error) + '</span>'; render(); };
+          funRow.appendChild(b);
+        }
+        ev.appendChild(funRow);
+        card.appendChild(ev);
+        // money for everybody
+        const all = h('div', 'admin-event');
+        all.appendChild(h('div', 'admin-label', 'Give everyone'));
+        all.appendChild(field('Amount', '1000', [['Give to every player', async n => {
+          if (n <= 0) return;
+          const r = await api('/admin/everyone', { method: 'POST', authed: true, body: { money: n } });
+          if (r.ok) { sfx.great(); flash = `Gave ${fmt(n)} to ${r.players} players. It counts toward money earned.`; users = []; } else { sfx.bad(); flash = '<span class="err">' + esc(r.error) + '</span>'; }
+          render();
+        }, 'primary']]));
+        card.appendChild(all);
         if (flash) { card.appendChild(h('div', 'form-ok', flash)); flash = ''; }
         card.appendChild(h('div', 'admin-label', 'Players'));
         const search = h('input', 'admin-search'); search.placeholder = 'Find a player'; search.value = filter;
@@ -488,14 +517,14 @@ export function openAdmin(opts = {}) {
           const list = (me && match(me) ? [me] : []).concat(users.filter(u => u !== me && match(u)));
           box.innerHTML = '';
           for (const u of list) {
-            const b = h('button', 'admin-user' + (u === me ? ' me' : '') + (u.hidden ? ' hid' : ''), `<b>${esc(u.username)}${u === me ? ' (you)' : ''}${u.hidden ? ' (hidden)' : ''}</b><span>${esc(rankName(u.rank || 0))} · Day ${u.days || 0} · ${fmt(u.earned || 0)} earned</span>`);
+            const b = h('button', 'admin-user' + (u === me ? ' me' : '') + (u.hidden ? ' hid' : ''), `<b>${esc(u.username)}${u === me ? ' (you)' : ''}${u.hidden ? ' (hidden)' : ''}${u.paused ? ' (paused)' : ''}</b><span>${esc(rankName(u.rank || 0))} · Day ${u.days || 0} · ${fmt(u.earned || 0)} earned</span>`);
             b.onclick = () => { sfx.click(); pick = u; render(); };
             box.appendChild(b);
           }
           if (!box.children.length) box.innerHTML = '<div class="lb-msg">Nobody by that name.</div>';
         };
         drawList();
-        if (!users.length) api('/admin/users', { authed: true }).then(r => { if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; } users = r.users || []; config = r.config || config; if (wantPick) pick = users.find(u => u.username === wantPick) || null; render(); });
+        if (!users.length) api('/admin/users', { authed: true }).then(r => { if (!r.ok) { box.innerHTML = `<div class="lb-msg">${esc(r.error)}</div>`; return; } users = r.users || []; config = r.config || config; lists = { cheers: r.cheers || [], visitors: r.visitors || [], cheats: r.cheats || [] }; if (wantPick) pick = users.find(u => u.username === wantPick) || null; render(); });
         return;
       }
       // ---- one player ----
@@ -505,6 +534,52 @@ export function openAdmin(opts = {}) {
       if (flash) { card.appendChild(h('div', 'form-ok', flash)); flash = ''; }
       const wrap = h('div', 'admin-sections'); card.appendChild(wrap);
       const sec = (title) => { const d = h('div', 'admin-sec'); d.appendChild(h('div', 'admin-label', title)); wrap.appendChild(d); return d; };
+      // ---- info ----
+      const info = sec('Player info');
+      const infoBox = h('div', 'admin-info', '<span class="muted">Loading…</span>'); info.appendChild(infoBox);
+      const showInfo = () => {
+        if (!detail) return;
+        const d = detail.user, g = detail.game;
+        const rows = [
+          ['Last played', ago(d.updated_at)], ['Account made', d.created_at ? new Date(d.created_at).toLocaleDateString() : '?'],
+          ['Logged in on', `${d.devices || 0} device${d.devices === 1 ? '' : 's'}`], ['Waiting changes', String(d.pending || 0)],
+          ['Status', d.paused ? 'Paused' : d.hidden ? 'Hidden from boards' : 'Normal'],
+        ];
+        if (g) rows.push(['Game day', String(g.day || 1)], ['Patients treated', String(g.patients || 0)], ['Three-star visits', String(g.threeStars || 0)], ['Lawsuits', String(g.lawsuits || 0)], ['Awards', String(g.awards || 0)], ['Codes found', String(g.codes || 0)]);
+        infoBox.innerHTML = rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join('');
+      };
+      if (detailFor === u.username && detail) showInfo();
+      else api('/admin/user?name=' + encodeURIComponent(u.username), { authed: true }).then(r => { if (!r.ok) { infoBox.innerHTML = `<span class="err">${esc(r.error)}</span>`; return; } detail = r; detailFor = u.username; u.paused = r.user.paused; showInfo(); });
+      // ---- fun ----
+      const fun = sec('Fun');
+      if (lists.visitors.length) {
+        const row = h('div', 'admin-field');
+        row.appendChild(h('label', '', 'Send a patient'));
+        const sel = h('select', 'admin-select');
+        for (const v of lists.visitors) { const o = h('option', '', VISITOR_NAMES[v] || v); o.value = v; sel.appendChild(o); }
+        row.appendChild(sel);
+        const b = h('button', 'btn small primary', 'Send'); b.onclick = () => { sfx.click(); send({ type: 'patient', value: sel.value }, `${VISITOR_NAMES[sel.value] || sel.value} is on the way. They show up as the next patient.`); };
+        row.appendChild(b); fun.appendChild(row);
+      }
+      if (lists.cheats.length) {
+        fun.appendChild(h('div', 'admin-sub', 'Silly modes (on their device)'));
+        const row = h('div', 'admin-money');
+        for (const ch of lists.cheats) {
+          const on = h('button', 'btn small', `${esc(CHEAT_NAMES[ch] || ch)} on`); on.onclick = () => { sfx.click(); send({ type: 'cheat', mode: ch, on: true }, `${CHEAT_NAMES[ch]} turned on.`); };
+          const off = h('button', 'btn small', 'off'); off.onclick = () => { sfx.click(); send({ type: 'cheat', mode: ch, on: false }, `${CHEAT_NAMES[ch]} turned off.`); };
+          const pair = h('span', 'admin-pair'); pair.append(on, off); row.appendChild(pair);
+        }
+        fun.appendChild(row);
+      }
+      if (lists.cheers.length) {
+        const row = h('div', 'admin-field');
+        row.appendChild(h('label', '', 'Send a cheer'));
+        const sel = h('select', 'admin-select wide');
+        lists.cheers.forEach((t, i) => { const o = h('option', '', t); o.value = i; sel.appendChild(o); });
+        row.appendChild(sel);
+        const b = h('button', 'btn small', 'Send'); b.onclick = () => { sfx.click(); send({ type: 'cheer', id: Number(sel.value) }, 'Cheer sent.'); };
+        row.appendChild(b); fun.appendChild(row);
+      }
       const m = sec('Money');
       m.appendChild(field('Amount', '1000', [
         ['Give', n => send({ type: 'gift', money: Math.max(0, n) }, `Gave ${fmt(n)}. It counts toward money earned.`), 'primary'],
@@ -546,6 +621,29 @@ export function openAdmin(opts = {}) {
         send({ type: 'reset' }, `${u.username} starts over from day 1.`);
       };
       exRow.append(aw, cd, rst); ex.appendChild(exRow);
+      // ---- account help ----
+      const acct = sec('Account');
+      const pw = h('div', 'admin-field');
+      pw.appendChild(h('label', '', 'New password'));
+      const pin = h('input'); pin.type = 'text'; pin.autocomplete = 'off'; pin.placeholder = '6 or more letters'; pin.maxLength = 64;
+      pw.appendChild(pin);
+      const pb = h('button', 'btn small', 'Set password');
+      pb.onclick = () => { sfx.click(); const v = pin.value.trim(); if (v.length < 6) { flash = '<span class="err">Passwords need at least 6 characters.</span>'; render(); return; } send({ type: 'password', value: v }, `New password set. ${me ? '' : 'Tell ' + u.username + ' in person, and they can log in with it now.'}`); };
+      pw.appendChild(pb); acct.appendChild(pw);
+      const acRow = h('div', 'admin-money');
+      const lo = h('button', 'btn small', 'Log out on every device'); lo.onclick = () => { sfx.click(); send({ type: 'logout' }, me ? 'Your other devices are logged out.' : `${u.username} is logged out everywhere.`); };
+      acRow.appendChild(lo);
+      if (!me) {
+        const ps = h('button', 'btn small ' + (u.paused ? '' : 'danger'), u.paused ? 'Unpause account' : 'Pause account');
+        let armP = false;
+        ps.onclick = () => {
+          sfx.click();
+          if (!u.paused && !armP) { armP = true; ps.textContent = 'Tap again: they cannot log in'; setTimeout(() => { armP = false; ps.textContent = 'Pause account'; }, 4000); return; }
+          send({ type: 'pause', value: !u.paused }, u.paused ? `${u.username} can log in again.` : `${u.username} is paused and logged out.`).then(ok => { if (ok) { u.paused = u.paused ? 0 : 1; detail = null; render(); } });
+        };
+        acRow.appendChild(ps);
+      }
+      acct.appendChild(acRow);
       const row = h('div', 'card-buttons');
       const back = h('button', 'btn', 'Back to players'); back.onclick = () => { sfx.click(); pick = null; render(); };
       row.append(back); card.appendChild(row);
@@ -555,7 +653,7 @@ export function openAdmin(opts = {}) {
 }
 export async function loadConfig() {
   const r = await api('/config');
-  if (r.ok && hooks.onConfig) hooks.onConfig({ payBoost: r.payBoost || 1, boostUntil: r.boostUntil || 0 });
+  if (r.ok && hooks.onConfig) hooks.onConfig({ payBoost: r.payBoost || 1, boostUntil: r.boostUntil || 0, events: r.events || {} });
 }
 
 function cloudBlob() {

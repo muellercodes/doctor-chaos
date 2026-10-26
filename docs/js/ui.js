@@ -84,6 +84,7 @@ export function createUI(root, E) {
   // ---------- HUD ----------
   const hud = layer('hud hidden');
   const hudDay = h('div', 'pill', 'Day 1'); const hudPat = h('div', 'pill', ''); const hudMoney = h('div', 'pill money', '$0');
+  const hudJob = h('div', 'pill job', '');
   const muteBtn = h('button', 'icon-btn interactive', icon('soundOn'));
   muteBtn.title = 'Sound on/off';
   muteBtn.onclick = () => { muteBtn.blur(); sfx.setMuted(!sfx.muted); muteBtn.innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); ui.onMute && ui.onMute(sfx.muted); };
@@ -94,11 +95,12 @@ export function createUI(root, E) {
   const gearBtn = h('button', 'icon-btn interactive', icon('pause'));
   gearBtn.title = 'Pause';
   gearBtn.onclick = () => { gearBtn.blur(); sfx.click(); ui.onGear && ui.onGear(); };
-  hud.append(hudDay, hudPat, hudMoney, h('div', 'spacer'), muteBtn, fsBtn, gearBtn);
+  hud.append(hudDay, hudPat, hudMoney, hudJob, h('div', 'spacer'), muteBtn, fsBtn, gearBtn);
   ui.syncMute = () => { muteBtn.innerHTML = icon(sfx.muted ? 'soundOff' : 'soundOn'); };
   ui.showHUD = v => hud.classList.toggle('hidden', !v);
   let shownMoney = null;
-  ui.setHUD = ({ day, patient, money, label }) => {
+  ui.setHUD = ({ day, patient, money, label, job }) => {
+    if (job !== undefined) { hudJob.textContent = job; hudJob.style.display = job ? '' : 'none'; }
     if (day !== undefined) hudDay.textContent = label || `Day ${day}`;
     if (patient !== undefined) { hudPat.textContent = patient; hudPat.style.display = patient ? '' : 'none'; }
     if (money !== undefined) {

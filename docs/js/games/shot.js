@@ -88,7 +88,7 @@ export async function play(G, P, prm = {}) {
   const omega = 1.9 + diff * 1.6;
   const green = 0.2 * G.tol * (G.tutorial ? 1.4 : 1);
   const angM = ui.meter({ label: 'Line it up', marker: true, zones: [{ from: 0, to: 1, color: '#ffb3b3' }, { from: 0.5 - green / (2 * amp), to: 0.5 + green / (2 * amp), color: '#7be495' }], value: 0.5 });
-  ui.hint('Move the needle to the circle. <b>Click when it lines up</b> with the dotted guide!');
+  ui.hint(E.coarse ? 'Drag the needle to the circle. <b>Let go when it lines up</b> with the dotted guide!' : 'Move the needle to the circle. <b>Click when it lines up</b> with the dotted guide!');
   let aimMiss = 0, q = 0, phaseT = 0;
   const maxAim = G.tutorial ? 99 : 3;
   let failed = false;
@@ -96,7 +96,8 @@ export async function play(G, P, prm = {}) {
   G.dbg.phase = 'aim'; G.dbg.angErr = () => Math.abs(curAng - base); G.dbg.green = green;
   E.input.requireRelease();
   let pendingAng = base;
-  S.on('down', () => { if (aiming) { pending = E.pointerOnPlane(plane) || target.clone(); pendingAng = curAng; } });
+  // drag into place, let go to stick it (a finger can see the needle before it commits)
+  S.pick(() => { if (aiming) { pending = E.pointerOnPlane(plane) || target.clone(); pendingAng = curAng; } }, 'aim');
   while (true) {
     pending = null; aiming = true;
     let ang = base;

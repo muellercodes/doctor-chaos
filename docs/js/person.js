@@ -5,7 +5,69 @@ import { Face, headGeometry, headPoint, skinTexture, hairShell } from './face.js
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 // silly modes unlocked with secret codes
-export const FLAGS = { bighead: false, party: false, zoomies: false, cats: false };
+export const FLAGS = { bighead: false, party: false, zoomies: false, cats: false, wear: null };
+// what patients wear in the themed departments (see themes.js). Nothing covers the face, so every
+// procedure still works.
+function deptWear(p, kind, HR0, HC, seed) {
+  const h = p.j.head;
+  const HR = Math.max(HR0, (p.hairR || HR0) * 0.97);   // sized to fit over the hair
+  const pick = a => a[seed % a.length];
+  if (kind === 'sweatband') {
+    // hugs the forehead (hair can sit over it, like a real sweatband)
+    const r = HR0 * 1.06 + (HR - HR0) * 0.35;
+    const band = mesh(new THREE.TorusGeometry(r, HR0 * 0.1, 8, 30), pick(['#e53935', '#1e88e5', '#ffffff', '#43a047']));
+    band.rotation.x = Math.PI / 2 - 0.22; band.position.set(0, HC + HR0 * 0.3, -HR0 * 0.02); band.scale.set(1, 1.1, 1); h.add(band);
+  }
+  if (kind === 'nightcap') {
+    const g = new THREE.Group(); g.position.set(0, HC + HR * 0.5, -HR * 0.05); g.rotation.set(-0.2, 0, 0.15);
+    const col = pick(['#5c6bc0', '#26a69a', '#ec407a']);
+    const tex = canvasTexture(64, 64, (ctx, W, H) => { ctx.fillStyle = col; ctx.fillRect(0, 0, W, H); ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let y = 0; y < H; y += 16) ctx.fillRect(0, y, W, 6); }).tex;
+    const geo = new THREE.ConeGeometry(HR * 1.0, HR * 2.2, 18, 10, true);
+    // droop: the higher up the cap, the more it bends over to one side
+    const pos = geo.attributes.position;
+    for (let k = 0; k < pos.count; k++) { const y = pos.getY(k) + HR * 1.1, f = Math.max(0, y / (HR * 2.2)); pos.setX(k, pos.getX(k) + f * f * HR * 1.6); pos.setY(k, pos.getY(k) - f * f * HR * 0.9); }
+    geo.computeVertexNormals();
+    const c = mesh(geo, new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.9 })); c.position.y = HR * 1.0; g.add(c);
+    const brim = mesh(new THREE.TorusGeometry(HR * 1.0, HR * 0.13, 8, 24), '#ffffff'); brim.rotation.x = Math.PI / 2; g.add(brim);
+    const pom = sphere(HR * 0.22, '#ffffff', 10); pom.position.set(HR * 1.6, HR * 1.25, 0); g.add(pom);
+    h.add(g);
+  }
+  if (kind === 'antenna') {
+    const band = mesh(new THREE.TorusGeometry(HR * 1.02, HR * 0.05, 6, 30, Math.PI), '#90a4ae');
+    band.position.set(0, HC + HR * 0.1, -HR * 0.05); h.add(band);
+    for (const sx of [1, -1]) {
+      const st = capsule(HR * 0.04, HR * 0.9, '#b0bec5'); st.position.set(sx * HR * 0.5, HC + HR * 1.3, -HR * 0.05); st.rotation.z = -sx * 0.35; h.add(st);
+      const ball = sphere(HR * 0.17, pick(['#76ff03', '#ff4081', '#40c4ff']), 12); ball.position.set(sx * HR * 0.78, HC + HR * 1.78, -HR * 0.05); h.add(ball);
+    }
+  }
+  if (kind === 'snorkel') {
+    const g = new THREE.Group(); g.position.set(0, HC + HR * 0.62, HR * 0.55); g.rotation.x = -0.75;
+    const frame = mesh(new THREE.TorusGeometry(HR * 0.42, HR * 0.07, 8, 24), pick(['#ffd23f', '#ff7043', '#29b6f6'])); frame.scale.set(1.25, 0.75, 1); g.add(frame);
+    const glass = new THREE.Mesh(new THREE.CircleGeometry(HR * 0.42, 24), new THREE.MeshStandardMaterial({ color: '#b3e5fc', transparent: true, opacity: 0.45, roughness: 0.05 })); glass.scale.set(1.25, 0.75, 1); g.add(glass);
+    h.add(g);
+    const strap = mesh(new THREE.TorusGeometry(HR0 * 1.06 + (HR - HR0) * 0.4, HR0 * 0.05, 6, 30), '#263238'); strap.rotation.x = Math.PI / 2 - 0.5; strap.position.set(0, HC + HR * 0.45, 0); h.add(strap);
+    const tube = capsule(HR * 0.06, HR * 1.3, '#ff7043'); tube.position.set(HR * 1.02, HC + HR * 0.55, HR * 0.1); tube.rotation.z = -0.15; h.add(tube);
+  }
+  if (kind === 'dino') {
+    const col = pick(['#7cb342', '#26a69a', '#ab47bc', '#ff8a65']);
+    // a soft hood the spikes are sewn onto
+    const hood = mesh(new THREE.SphereGeometry(HR * 1.18, 24, 14, 0, Math.PI * 2, 0, Math.PI * 0.42), col); hood.position.set(0, HC + HR * 0.02, -HR * 0.08); hood.rotation.x = -0.35; h.add(hood);
+    for (let i = 0; i < 5; i++) {
+      const a = -0.55 + i * 0.42; // from the forehead over the top to the back
+      const sp = mesh(new THREE.ConeGeometry(HR * (0.3 - Math.abs(i - 2) * 0.035), HR * (0.85 - Math.abs(i - 2) * 0.12), 4), col);
+      sp.scale.z = 0.5;
+      const r = HR * 1.3;   // sits on top of the hair, even big curly hair
+      sp.position.set(0, HC + Math.cos(a) * r, -Math.sin(a) * r + HR * 0.06); sp.rotation.x = -a; h.add(sp);
+    }
+  }
+  if (kind === 'cape') {
+    const col = pick(['#d32f2f', '#1e88e5', '#8e24aa', '#2e7d32']);
+    const cape = mesh(new THREE.CylinderGeometry(0.17, 0.33, 0.9, 18, 1, true, Math.PI * 0.62, Math.PI * 0.76), toon(col, { side: THREE.DoubleSide }));
+    cape.position.set(0, 0.2, -0.05); p.j.spine.add(cape);
+    for (const sx of [1, -1]) { const tie = capsule(0.012, 0.12, col); tie.position.set(sx * 0.1, 0.6, 0.06); tie.rotation.z = sx * 1.1; p.j.spine.add(tie); }
+    const clasp = sphere(0.028, '#ffd23f', 10); clasp.position.set(0, 0.57, 0.12); p.j.spine.add(clasp);
+  }
+}
 function catEars(head, y, r, color) {
   for (const sx of [1, -1]) {
     const e = new THREE.Mesh(new THREE.ConeGeometry(r * 0.32, r * 0.55, 4), toon(color)); e.position.set(sx * r * 0.5, y, -r * 0.05); e.rotation.set(0, Math.PI / 4, -sx * 0.35); head.add(e);
@@ -140,6 +202,8 @@ export const POSES = {
   stand: {},
   sit: SIT,
   lie: { shL: [0, 0, 0.1], shR: [0, 0, -0.1] },
+  // sitting with the legs stretched out along the table (on the way to lying down)
+  longSit: { ...SIT, knL: [0.1, 0, 0], knR: [0.1, 0, 0], elL: [-0.35, 0, -0.2], elR: [-0.35, 0, 0.2] },
   armOutR: { ...SIT, shR: [0, -0.12, -1.5], elR: [0, 0, 0] },
   armOutL: { ...SIT, shL: [0, 0.12, 1.5], elL: [0, 0, 0] },
   scared: { ...SIT, shL: [-0.2, 0, 2.5], shR: [-0.2, 0, -2.5], elL: [-0.5, 0, 0], elR: [-0.5, 0, 0] },
@@ -211,9 +275,20 @@ export class Person {
     }
     this.face = new Face(j.head, HR, HC, { skin, skinMat: this.skinMat, shape: d => headPoint(d, HR, shapeO), kid: kidish, lashes: fem, browColor: darken(hairC, 0.8), thickBrows: !fem && age !== 'kid', fangs: spec.outfit === 'vampire', eyeColor: spec.eyes });
     this.shapeO = shapeO;
+    const n0 = j.head.children.length;
     this.buildHair(spec, HR, HC, hairC);
+    // how far the hair reaches from the middle of the head, so hats sit on top of big hair
+    this.hairR = HR;
+    for (const m of j.head.children.slice(n0)) {
+      if (!m.geometry) continue;
+      m.updateMatrix(); m.geometry.computeBoundingBox();
+      const bb = m.geometry.boundingBox.clone().applyMatrix4(m.matrix);
+      this.hairR = Math.max(this.hairR, bb.max.y - HC, Math.abs(bb.min.x), Math.abs(bb.max.x), -bb.min.z * 0.95);
+    }
+    this.hairR = Math.min(this.hairR, HR * 1.45);
     if (FLAGS.party) partyHat(j.head, HC + HR * 1.02, HR, (shirt.charCodeAt(1) || 0) + (shirt.charCodeAt(3) || 0));
     if (FLAGS.cats) catEars(j.head, HC + HR * 0.95, HR, hairC);
+    if (FLAGS.wear && !spec.outfit) deptWear(this, FLAGS.wear, HR, HC, (shirt.charCodeAt(2) || 0) + (shirt.charCodeAt(4) || 0));
 
     // arms
     for (const side of ['L', 'R']) {
@@ -226,7 +301,7 @@ export class Person {
         const hem = mesh(new THREE.TorusGeometry(0.058, 0.007, 5, 18), shirtDark); hem.rotation.x = Math.PI / 2; hem.position.y = -0.08; hem.castShadow = false; sh.add(hem);
       }
       const el = j['el' + side] = new THREE.Group(); el.position.y = -0.27; sh.add(el);
-      const elb = sphere(0.046, longSleeves ? shirtMat : toon(skin), 12); el.add(elb);
+      const elb = sphere(0.0425, longSleeves ? shirtMat : toon(skin), 14); elb.scale.set(0.96, 1.1, 0.92); el.add(elb);
       const fa = muscle(0.044, 0.049, 0.033, 0.17, longSleeves ? shirtMat : toon(skin), 0.22); fa.position.y = -0.12; el.add(fa);
       if (longSleeves) { const cuff = mesh(new THREE.CylinderGeometry(0.043, 0.043, 0.035, 14), shirtDark); cuff.position.y = -0.205; el.add(cuff); }
       const hand = this.buildHand(skin, sx); hand.position.y = -0.255; el.add(hand);
@@ -237,7 +312,7 @@ export class Person {
       const th = muscle(0.082 * Math.sqrt(wide), 0.086 * Math.sqrt(wide), 0.062, 0.27, pantsMat, 0.3); th.position.y = -0.19; hip.add(th);
       const kn = j['kn' + side] = new THREE.Group(); kn.position.y = -0.4; hip.add(kn);
       const shinMat = spec.shorts ? toon(skin) : pantsMat;
-      const kc = sphere(0.064, shinMat, 14); kc.position.set(0, -0.004, 0.004); kn.add(kc);
+      const kc = sphere(0.0575, shinMat, 16); kc.position.set(0, 0.0, -0.002); kc.scale.set(0.97, 1.08, 0.9); kn.add(kc);
       const sn = muscle(0.058, 0.066, 0.043, 0.27, shinMat, 0.3); sn.position.y = -0.19; kn.add(sn);
       if (spec.shorts) {
         const leg = mesh(new THREE.CylinderGeometry(0.085, 0.082, 0.1, 16, 1, true), pantsMat); leg.position.y = -0.36; hip.add(leg);
@@ -585,37 +660,44 @@ export class Person {
       this.root.position.y = p0.y + (this.standY - p0.y) * sm(0.2, 1, k) + Math.sin(k * Math.PI) * 0.15;
     }, t => t);
   }
-  // Lie back on the table: tilt back with knees up, swing around, then straighten the legs.
+  // Set every joint part way between two poses (used to move smoothly through a getting-up or lying-down motion).
+  poseMix(a, b, k) {
+    const pa = { ...BASE, ...(POSES[a] || {}) }, pb = { ...BASE, ...(POSES[b] || {}) };
+    for (const j of JOINTS) { const v = [0, 1, 2].map(i => pa[j][i] + (pb[j][i] - pa[j][i]) * k); this.cur[j] = v; this.target[j] = v.slice(); }
+    this.poseName = k < 0.5 ? a : b;
+  }
+  // Lie down the way people really do: swing the legs up onto the table, then lie back while the legs stay flat.
   async lieDown(E) {
     const p0 = this.root.position.clone();
     this.root.rotation.order = 'YXZ';
-    this.setPose('sit');
     const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-    await E.tween(1.0, (e, k) => {
-      const tilt = sm(0, 0.45, k), turn = sm(0.4, 0.9, k);
-      this.root.rotation.set(-Math.PI / 2 * tilt, Math.PI / 2 * turn, 0, 'YXZ');
-      this.root.position.set(p0.x + (0.25 - p0.x) * turn, p0.y + (this.lieY - p0.y) * tilt + Math.sin(tilt * Math.PI) * 0.06, p0.z + (0.1 - p0.z) * tilt + (0 - 0.1) * turn);
+    const X = 0.25;
+    await E.tween(1.35, (e, k) => {
+      const swing = sm(0, 0.42, k), back = sm(0.4, 1, k);
+      if (back <= 0) this.poseMix('sit', 'longSit', swing); else this.poseMix('longSit', 'lie', back);
+      this.root.rotation.set(-Math.PI / 2 * back, Math.PI / 2 * swing, 0, 'YXZ');
+      this.root.position.set(p0.x + (X - p0.x) * swing, p0.y + (this.lieY - p0.y) * back + Math.sin(swing * Math.PI) * 0.03, p0.z + (0 - p0.z) * swing);
     }, t => t);
-    this.root.position.set(0.25, this.lieY, 0);
+    this.root.position.set(X, this.lieY, 0);
     this.root.rotation.set(-Math.PI / 2, Math.PI / 2, 0, 'YXZ');
-    this.setPose('lie');
-    await E.wait(0.35);
+    this.setPose('lie', true);
     this.lying = true;
+    await E.wait(0.2);
   }
-  // Reverse of lieDown: knees up, swing back around, sit up.
+  // Reverse of lieDown: sit up with the legs flat, then swing them back off the edge of the table.
   async sitUp(E) {
     this.root.rotation.order = 'YXZ';
-    this.setPose('sit');
-    await E.wait(0.3);
     const p0 = this.root.position.clone();
     const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-    await E.tween(0.9, (e, k) => {
-      const turn = sm(0, 0.5, k), tilt = sm(0.45, 1, k);
-      this.root.rotation.set(-Math.PI / 2 * (1 - tilt), Math.PI / 2 * (1 - turn), 0, 'YXZ');
-      this.root.position.set(p0.x + (0 - p0.x) * turn, p0.y + (this.sitY - p0.y) * tilt + Math.sin(tilt * Math.PI) * 0.06, p0.z + (0.1 - p0.z) * turn + (0.24 - 0.1) * tilt);
+    await E.tween(1.2, (e, k) => {
+      const up = sm(0, 0.55, k), swing = sm(0.5, 1, k);
+      if (swing <= 0) this.poseMix('lie', 'longSit', up); else this.poseMix('longSit', 'sit', swing);
+      this.root.rotation.set(-Math.PI / 2 * (1 - up), Math.PI / 2 * (1 - swing), 0, 'YXZ');
+      this.root.position.set(p0.x + (0 - p0.x) * swing, p0.y + (this.sitY - p0.y) * up + Math.sin(swing * Math.PI) * 0.03, p0.z + (0.24 - p0.z) * swing);
     }, t => t);
     this.root.position.set(0, this.sitY, 0.24);
     this.root.rotation.set(0, 0, 0, 'YXZ');
+    this.setPose('sit', true);
     this.lying = false;
   }
   // useful world points

@@ -80,13 +80,14 @@ export async function play(G, P, prm = {}) {
   const glow = new THREE.Mesh(new THREE.CircleGeometry(lightR, 32), glowMat); S.add(glow);
   const glowRing = new THREE.Mesh(new THREE.RingGeometry(lightR * 0.96, lightR, 40), new THREE.MeshBasicMaterial({ color: '#c77dff' }));
   glowRing.material.userData.dispose = true; S.add(glowRing);
-  ui.hint('Move the <b>Vein Finder</b> light around. <b>Click the BIG blue vein!</b>');
+  ui.hint(E.coarse ? 'Drag the <b>Vein Finder</b> light around. <b>Tap the BIG blue vein!</b>' : 'Move the <b>Vein Finder</b> light around. <b>Click the BIG blue vein!</b>');
   let misses = 0, quality = 0, hit = null, failed = false;
   G.dbg.phase = 'vein'; G.dbg.vein = veins[0].pts[30];
   E.input.requireRelease();
   const maxMiss = G.tutorial ? 99 : 3;
   let pending = null;
-  S.on('down', () => { pending = E.pointerOnPlane(plane); });
+  // drag the light around to look; tap the vein to pick it (a drag never counts as a poke)
+  S.pick(() => { pending = E.pointerOnPlane(plane); }, 'explore');
   await new Promise(res => {
     const off = S.update(() => {
       const p = E.pointerOnPlane(plane);

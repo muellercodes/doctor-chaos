@@ -66,7 +66,28 @@ export const FOOD_REFUND = {
   short_pour: 'Half a soda for a whole soda price. I am outraged.',
   ice_mess: 'Most of my ice cream landed on the floor. The floor enjoyed it. I did not.',
   wrong_burger: 'My burger was stacked upside down. The bun was in the middle.',
+  wrong_order: 'They got my order wrong. Then they got it wrong AGAIN.',
 };
+// "You got my order wrong!" When the station work really was off, they say exactly what is wrong.
+export const FOOD_ANGRY = {
+  grill: ['Excuse me. This burger is RAW. It just mooed at me.', 'I said well done. This is well burnt.', 'This patty is cold in the middle. COLD. Like my heart right now.', 'Is this a burger or a hockey puck?'],
+  fryer: ['These fries are soggy. They are basically potato noodles.', 'Where is the salt? I asked for salt!', 'These fries are way too salty. I can feel my blood pressure going up.', 'These fries are burnt. I can taste the smoke.'],
+  soda: ['This cup is half empty. I ordered a WHOLE drink.', 'This is mostly foam! I cannot drink bubbles!', 'Hey! This is not the size I ordered!', 'The cup is sticky. And not full. Mostly sticky.'],
+  sundae: ['My ice cream is falling over! It is leaning like a tower!', 'This cone is lopsided. It looks sad.', 'Where is the ice cream? This is just a cone with a dream.', 'Half of my ice cream is on the outside of the cone!'],
+  assemble: ['There are pickles on this! I said NO pickles!', 'The bun is upside down. The burger is upside down. My day is upside down.', 'Where is the cheese? I specifically asked for cheese!', 'The lettuce is on the bottom! That is illegal!'],
+};
+// Picky customers who say it is wrong even when it is not.
+export const FOOD_PICKY = ['This is NOT what I ordered!', 'Hmm. No. This is wrong. I can feel it.', 'I wanted it with extra love. I do not taste any love.', 'Wrong! I ordered the exact same thing, but different.', 'This does not look like the picture on the menu!', 'Excuse me, this burger is looking at me funny.', 'Hold on. I changed my mind. And you should have known that.'];
+// Manager Pat, every single time
+export const MANAGER_REMAKE = ['The customer is always right. Even when they are wrong. Make it again.', 'Rule number one: the customer is always right. Rule number two: make it again.', 'Ugh. Fine. Remake it. Smile while you do it.', 'Let me guess. Make it again? Make it again.'];
+// after a good remake
+export const FOOD_REMAKE_OK = ['Now THAT is what I ordered. Thank you.', 'Much better. See? Was that so hard?', 'Okay, okay. This one is perfect. I forgive you.', 'Yes! Finally! You are a burger hero.'];
+// the picky ones, after the remake, when they figure it out
+export const FOOD_REMAKE_SORRY = ['Oh. Wait. The first one was right. I was looking at my friend\'s order. Sorry.', 'Hmm. This looks exactly like the first one. I am going to leave a tip and walk away quietly.', 'You know what, I was just hungry and grumpy. Here, keep the change.', 'My mom says I have to say sorry. Sorry. It was fine.'];
+export const FOOD_REMAKE_BAD = ['Worse. It is WORSE. How is it worse?', 'I asked for a fix, not a sequel.', 'Nope. I want my money back.'];
+export const FOOD_COUPON = ['A coupon? Fine. I am still telling my friends.', 'Hmph. I will take the coupon. And the attitude.', 'Okay. But I am eating it angrily.', 'A coupon for my next visit? There might not BE a next visit.'];
+export const STATION_NAMES = { grill: 'burger patty', fryer: 'fries', soda: 'drink', sundae: 'ice cream cone', assemble: 'burger' };
+
 export const FOOD_REVIEWS = {
   3: ['Best burger I ever had. And I have had a LOT of burgers.', 'Fast, hot and perfect. Five stars.', 'The fries were so crispy they made music.', 'Would order again. Already did. Twice.'],
   2: ['Pretty good. The fries were a little shy.', 'Good food. The cook was humming doctor stuff though.', 'Tasty! A little slow.', 'Solid burger. Medium soda.'],

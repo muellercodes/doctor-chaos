@@ -10,12 +10,21 @@ const MAX_RANK = 110;
 const CODE_WORDS = (GUIDE.find(sec => /secret codes/i.test(sec.title)) || { items: [] }).items.map(i => i[0]).filter(w => /^[A-Z]+$/.test(w));
 // pending admin changes for a user; while any are waiting, the player's own syncs do not overwrite the boards
 const pendingFor = (env, id) => env.DB.prepare('SELECT COUNT(*) AS n FROM gifts WHERE user_id = ? AND claimed_at IS NULL').bind(id).first().then(r => (r ? r.n : 0));
+// fun events the creator can turn on for everyone (each has an end time)
+const EVENTS = ['party', 'bighead', 'cats', 'specials'];
 async function getConfig(env) {
   const { results } = await env.DB.prepare('SELECT key, value FROM config').all();
   const c = {}; for (const r of results || []) { try { c[r.key] = JSON.parse(r.value); } catch (e) { /* ignore */ } }
   const boost = c.payBoost && c.payBoost.until > now() ? c.payBoost : null;
-  return { payBoost: boost ? boost.x : 1, boostUntil: boost ? boost.until : 0 };
+  const events = {};
+  for (const k of EVENTS) { const until = c.events && c.events[k]; if (until > now()) events[k] = until; }
+  return { payBoost: boost ? boost.x : 1, boostUntil: boost ? boost.until : 0, events };
 }
+// preset cheers the creator can send (no free typing: nobody can use this to message kids)
+const CHEERS = ['Great job, doctor!', 'You are on fire! (Not literally. Nurse Pat checked.)', 'Keep it up!', 'Happy birthday!', 'Nurse Pat says hi.', 'You are a legend.', 'Nice work today!', 'Time for a snack break!', 'Welcome to Doctor Chaos!', 'You are the best!'];
+const VISITORS = ['runner', 'baby', 'sneezy', 'hider', 'scooter', 'germs', 'triplets', 'lightsout', 'vampire', 'pirate', 'trench', 'mime', 'influencer', 'grandma', 'ticklish', 'conspiracy'];
+const CHEATS = ['bighead', 'party', 'squeaky', 'zoomies', 'spooky', 'cats', 'robot'];
+const PAUSED = 9e15; // locked_until for an account the creator paused
 
 const ALLOWED_ORIGINS = ['https://muellercodes.github.io', 'https://doctor-chaos.pages.dev'];
 const ITER = 20000; // PBKDF2 rounds (kept modest so it fits the free plan's CPU limit)
@@ -131,6 +140,7 @@ export async function onRequest(context) {
       if (await limited(env, 'login:' + ip, 30, 6e5)) return fail(req, 'Too many tries. Wait ten minutes.', 429);
       const row = await env.DB.prepare('SELECT id, username, pass_hash, salt, fails, locked_until FROM users WHERE uname_lc = ?').bind(u.toLowerCase()).first();
       if (!row) return fail(req, "That username and password don't match.", 401);
+      if (row.locked_until >= PAUSED) return fail(req, 'This account is paused by the creator.', 403);
       if (row.locked_until > now()) return fail(req, 'Too many wrong passwords. This account is locked for a few minutes.', 429);
       const ph = await hashPassword(p, row.salt);
       if (!safeEqual(ph, row.pass_hash)) {
@@ -204,8 +214,38 @@ export async function onRequest(context) {
     if (route.startsWith('admin/')) {
       if (user.username !== GUIDE_USER) return fail(req, 'Only the creator can do that.', 403);
       if (route === 'admin/users' && req.method === 'GET') {
-        const { results } = await env.DB.prepare('SELECT username, days, money, earned, rank, hidden, created_at, updated_at FROM users ORDER BY uname_lc ASC LIMIT 1000').all();
-        return json(req, { users: results || [], config: await getConfig(env) });
+        const { results } = await env.DB.prepare('SELECT username, days, money, earned, rank, hidden, created_at, updated_at, CASE WHEN locked_until >= ? THEN 1 ELSE 0 END AS paused FROM users ORDER BY uname_lc ASC LIMIT 1000').bind(PAUSED).all();
+        return json(req, { users: results || [], config: await getConfig(env), cheers: CHEERS, visitors: VISITORS, cheats: CHEATS });
+      }
+      // one player's details: account info plus a summary of their saved game
+      if (route === 'admin/user' && req.method === 'GET') {
+        const name = String(new URL(req.url).searchParams.get('name') || '').toLowerCase();
+        const u = await env.DB.prepare('SELECT id, username, days, money, earned, gifted, rank, hidden, created_at, updated_at, locked_until, save FROM users WHERE uname_lc = ?').bind(name).first();
+        if (!u) return fail(req, 'No player has that name.', 404);
+        const seen = await env.DB.prepare('SELECT MAX(last_seen) AS t, COUNT(*) AS n FROM sessions WHERE user_id = ?').bind(u.id).first();
+        const pending = await pendingFor(env, u.id);
+        let game = null;
+        try {
+          const sv = u.save ? JSON.parse(u.save) : null, st = sv && sv.state, pr = sv && sv.profile;
+          if (st) game = { day: st.day, money: st.money, rank: st.rank, patients: st.stats && st.stats.patients, lawsuits: st.stats && st.stats.lawsuits, threeStars: st.stats && st.stats.threeStars, awards: pr && pr.ach ? Object.keys(pr.ach).length : 0, codes: pr && pr.codes ? Object.keys(pr.codes).length : 0 };
+        } catch (e) { game = null; }
+        return json(req, { user: { username: u.username, days: u.days, money: u.money, earned: u.earned, gifted: u.gifted, rank: u.rank, hidden: u.hidden, created_at: u.created_at, updated_at: u.updated_at, paused: u.locked_until >= PAUSED ? 1 : 0, last_seen: seen && seen.t, devices: seen ? seen.n : 0, pending }, game });
+      }
+      // give money to every player at once
+      if (route === 'admin/everyone' && req.method === 'POST') {
+        const b = await readBody(req);
+        if (!b) return fail(req, 'Bad request.');
+        const money = clampInt(b.money, 1, 1e9);
+        if (await limited(env, 'everyone:' + user.id, 20, 36e5)) return fail(req, 'Slow down a little. Try again in a bit.', 429);
+        const { results } = await env.DB.prepare('SELECT id FROM users WHERE hidden = 0 AND locked_until < ?').bind(PAUSED).all();
+        const act = JSON.stringify({ type: 'gift', money });
+        const stmts = [];
+        for (const r of results || []) {
+          stmts.push(env.DB.prepare('INSERT INTO gifts (user_id, money, upgrades, action, from_name, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(r.id, money, null, act, user.username, now()));
+          stmts.push(env.DB.prepare('UPDATE users SET money = money + ?, earned = earned + ?, gifted = gifted + ? WHERE id = ?').bind(money, money, money, r.id));
+        }
+        for (let i = 0; i < stmts.length; i += 90) await env.DB.batch(stmts.slice(i, i + 90));
+        return json(req, { ok: true, players: (results || []).length });
       }
       if ((route === 'admin/gift' || route === 'admin/action') && req.method === 'POST') {
         const b = await readBody(req);
@@ -256,6 +296,37 @@ export async function onRequest(context) {
           const v = a0.value ? 1 : 0;
           await env.DB.prepare('UPDATE users SET hidden = ? WHERE id = ?').bind(v, to.id).run();
           return json(req, { ok: true, to: to.username, hidden: v });
+        } else if (type === 'password') {
+          // a player forgot their password: the creator sets a new one (all their devices log out)
+          const p = String(a0.value || '');
+          if (p.length < 6 || p.length > 64) return fail(req, 'Passwords need 6 to 64 characters.');
+          const salt = randHex(16);
+          const ph = await hashPassword(p, salt);
+          await env.DB.batch([
+            env.DB.prepare('UPDATE users SET pass_hash = ?, salt = ?, fails = 0, locked_until = CASE WHEN locked_until >= ? THEN locked_until ELSE 0 END WHERE id = ?').bind(ph, salt, PAUSED, to.id),
+            env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(to.id, user.tokenHash),
+          ]);
+          return json(req, { ok: true, to: to.username });
+        } else if (type === 'logout') {
+          await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(to.id, user.tokenHash).run();
+          return json(req, { ok: true, to: to.username });
+        } else if (type === 'pause') {
+          if (to.id === user.id) return fail(req, "You can't pause your own account.");
+          const on = !!a0.value;
+          const stmts = [env.DB.prepare('UPDATE users SET locked_until = ?, fails = 0 WHERE id = ?').bind(on ? PAUSED : 0, to.id)];
+          if (on) stmts.push(env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(to.id));
+          await env.DB.batch(stmts);
+          return json(req, { ok: true, to: to.username, paused: on ? 1 : 0 });
+        } else if (type === 'patient') {
+          act.value = VISITORS.includes(a0.value) ? a0.value : null;
+          if (!act.value) return fail(req, 'Pick a patient to send.');
+        } else if (type === 'cheat') {
+          act.mode = CHEATS.includes(a0.mode) ? a0.mode : null;
+          if (!act.mode) return fail(req, 'Pick a silly mode.');
+          act.on = !!a0.on;
+        } else if (type === 'cheer') {
+          act.id = clampInt(a0.id, 0, CHEERS.length - 1);
+          act.text = CHEERS[act.id];
         } else return fail(req, 'Unknown admin action.');
         const stmts = [env.DB.prepare('INSERT INTO gifts (user_id, money, upgrades, action, from_name, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(to.id, act.money || 0, null, JSON.stringify(act), user.username, now())];
         for (const [frag, v] of sets) stmts.push(env.DB.prepare(`UPDATE users SET ${frag} WHERE id = ?`).bind(v, to.id));
@@ -265,10 +336,19 @@ export async function onRequest(context) {
       if (route === 'admin/config' && req.method === 'POST') {
         const b = await readBody(req);
         if (!b) return fail(req, 'Bad request.');
-        const x = [1, 2, 3, 5].includes(Number(b.payBoost)) ? Number(b.payBoost) : 1;
         const hours = clampInt(b.hours, 1, 72);
-        const val = x > 1 ? { x, until: now() + hours * 36e5 } : { x: 1, until: 0 };
-        await env.DB.prepare('INSERT INTO config (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at').bind('payBoost', JSON.stringify(val), now()).run();
+        const put = (k, v) => env.DB.prepare('INSERT INTO config (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at').bind(k, JSON.stringify(v), now()).run();
+        if (b.event !== undefined) {
+          // fun events: party hats, big heads, cat ears, or a special patient every day
+          if (!EVENTS.includes(b.event)) return fail(req, 'Unknown event.');
+          const row = await env.DB.prepare("SELECT value FROM config WHERE key = 'events'").first();
+          let ev = {}; try { ev = row ? JSON.parse(row.value) || {} : {}; } catch (e) { ev = {}; }
+          ev[b.event] = b.off ? 0 : now() + hours * 36e5;
+          await put('events', ev);
+        } else {
+          const x = [1, 2, 3, 5].includes(Number(b.payBoost)) ? Number(b.payBoost) : 1;
+          await put('payBoost', x > 1 ? { x, until: now() + hours * 36e5 } : { x: 1, until: 0 });
+        }
         return json(req, { ok: true, config: await getConfig(env) });
       }
       return fail(req, 'Not found.', 404);

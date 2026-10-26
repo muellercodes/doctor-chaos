@@ -7,6 +7,7 @@ import { createUI, h, arm } from './ui.js';
 import { sfx, music } from './audio.js';
 import * as D from './data.js';
 import * as C from './career.js';
+import { themeFor } from './themes.js';
 import * as FD from './food-data.js';
 import { stepLine } from './step-talk.js';
 import * as food from './games/food.js';
@@ -58,6 +59,7 @@ const hadSave = !!loadSave();
 // Upgrade levels past the third (unlocked by promotions) still help, just a bit less each.
 function upgEff(k) { const id = OLD_UP[k] || k; return Math.min(3, state.upgrades[id] || 0) + C.rankBonus(state.rank || 0); }
 let gameConfig = { payBoost: 1, boostUntil: 0 };
+const eventOn = k => !!(gameConfig.events && gameConfig.events[k] > Date.now());
 const boostNow = () => (gameConfig.payBoost > 1 && gameConfig.boostUntil > Date.now() ? gameConfig.payBoost : 1);
 function writeSave() { try { state.seen = ui.seenList(); state.muted = sfx.muted; state.savedAt = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } M.queueSync(); }
 
@@ -109,7 +111,7 @@ ui.onGear = async () => {
   E.paused = false;
 };
 
-E.onUpdate(dt => { R.monitor.update(dt); if (!clockSpin) R.updateClock(); });
+E.onUpdate((dt, t) => { R.monitor.update(dt); if (!clockSpin) R.updateClock(); R.tick(dt, t); });
 let clockSpin = false;
 const LIGHT0 = { hemi: R.hemi.intensity, hemiC: R.hemi.color.clone(), sun: R.sun.intensity };
 function applyGameSettings(st) {
@@ -119,11 +121,19 @@ function applyGameSettings(st) {
   E.setQuality(st.quality === 'fast');
   E.noShake = !st.shake;
   const ch = st.cheats || {};
-  FLAGS.bighead = !!ch.bighead; FLAGS.party = !!ch.party; FLAGS.zoomies = !!ch.zoomies; FLAGS.cats = !!ch.cats;
+  // silly modes from secret codes, or from an event the creator turned on for everyone
+  FLAGS.bighead = !!ch.bighead || eventOn('bighead'); FLAGS.party = !!ch.party || eventOn('party'); FLAGS.zoomies = !!ch.zoomies; FLAGS.cats = !!ch.cats || eventOn('cats');
   voice.robot = !!ch.robot; voice.enabled = st.voices !== false; voice.squeaky = !!ch.squeaky;
   sfx.pitch = ch.squeaky ? 1.8 : 1;
-  if (ch.spooky) { R.hemi.color.set('#b18cff'); R.hemi.intensity = LIGHT0.hemi * 0.6; R.sun.intensity = LIGHT0.sun * 0.35; }
-  else { R.hemi.color.copy(LIGHT0.hemiC); R.hemi.intensity = LIGHT0.hemi; R.sun.intensity = LIGHT0.sun; }
+  spooky = !!ch.spooky;
+  applyLights();
+}
+// the room's light: the department's tint, unless the GHOST code turned on spooky lights
+let spooky = false, deptLight = null;
+function applyLights() {
+  if (spooky) { R.hemi.color.set('#b18cff'); R.hemi.intensity = LIGHT0.hemi * 0.6; R.sun.intensity = LIGHT0.sun * 0.35; return; }
+  if (deptLight) { R.hemi.color.set(deptLight.color); R.hemi.intensity = LIGHT0.hemi * deptLight.k; R.sun.intensity = LIGHT0.sun * deptLight.k; return; }
+  R.hemi.color.copy(LIGHT0.hemiC); R.hemi.intensity = LIGHT0.hemi; R.sun.intensity = LIGHT0.sun;
 }
 
 // nurse NPC
@@ -186,6 +196,7 @@ const G = {
 window.__G = G;
 window.__D = D;
 window.__state = () => state;
+window.__applyGift = g => applyGift(g);   // test hook: apply an admin action locally
 M.initMeta({
   addMoney: n => { state.money += n; ui.setHUD({ money: state.money }); writeSave(); M.checkState(state); },
   getState: () => state,
@@ -193,7 +204,7 @@ M.initMeta({
   secretWord: w => secretWord(w),
   upgradeList: () => upgradesNow().map(u => ({ id: u.id, name: u.name, icon: u.icon })),
   career: C,
-  onConfig: c => { gameConfig = c || gameConfig; },
+  onConfig: c => { gameConfig = c || gameConfig; applyGameSettings(M.settings); },
   loadState: st => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(st)); } catch (e) { /* ignore */ } location.reload(); },
   resetTips: () => ui.resetSeen(),
   specialTypes: D.SPECIAL_TYPES,
@@ -213,8 +224,16 @@ function walkRoute(person, to, speed = 1.5, run = false) {
 let nurseCap = null;
 function applyTheme() {
   const on = C.isFood(state.rank || 0);
+  const info = C.rankInfo(state.rank || 0);
+  const th = on ? null : themeFor(info.deptIndex);
   G.food = on; ui.food = on;
+  // every department looks like its own place, and its patients dress the part
+  R.setDept(th);
+  FLAGS.wear = th ? th.wear : null;
+  deptLight = th ? th.light : null;
+  applyLights();
   R.setFood(on);
+  ui.setHUD({ job: info.title });
   ui.setNurseName(on ? 'Manager Pat' : 'Nurse Pat');
   if (on && !nurseCap) {
     nurseCap = new THREE.Group();
@@ -482,6 +501,51 @@ E.input.listeners.down.add(async () => {
 });
 
 // ---------------- one patient ----------------
+// A customer says the order is wrong. Sometimes they are right (the station work was sloppy) and
+// sometimes they are just picky. Manager Pat always sides with the customer.
+async function wrongOrder(P, results, worst, deserved) {
+  const { c } = P;
+  const person = P.person;
+  const step = worst.step;
+  person.expr(pick(['angry', 'yell'])); sfx.buzz(); G.mood(-8);
+  await faceCam(person, 0.5);
+  await G.say(pick(deserved ? FD.FOOD_ANGRY[step] || FD.FOOD_PICKY : FD.FOOD_PICKY), { key: 'c', hold: 1.1 });
+  await E.home(0.5);
+  await nurseSay(pick(FD.MANAGER_REMAKE), { hold: 1.2, mood: 'angry' });
+  const what = FD.STATION_NAMES[step] || 'order';
+  const v = await ui.card({
+    icon: M.icon('scroll'), title: 'Wrong order?!',
+    html: `<p><b>${c.first}</b> says you got the order wrong.</p><p class="muted">Make the ${what} again, or say sorry and hand over a coupon.</p>`,
+    buttons: [{ label: 'Make it again', value: 'redo', cls: 'primary' }, { label: 'Sorry! Have a coupon', value: 'coupon', cls: 'plain' }],
+  });
+  M.bump('wrong_orders');
+  if (v !== 'redo') {
+    P.coupon = true; person.expr('sad'); await faceCam(person, 0.5);
+    await G.say(pick(FD.FOOD_COUPON), { key: 'c', hold: 0.9 }); P.saidLast = true;
+    await E.home(0.5);
+    return;
+  }
+  ui.hideChart(); ui.clearBubbles();
+  music.play('focus');
+  let res;
+  try { res = await inGame(() => GAMES[step].play(G, P, c.params[step] || {})); } catch (err) { console.error('remake crashed', err); res = { score: 70, fail: false }; }
+  ui.hint(null); ui.timer.hide(); ui.clearActions(); ui.hideChart();
+  music.play('clinic');
+  person.setPose && person.setPose('stand');
+  await E.home(0.6);
+  res.step = step;
+  if (res.fail || res.score < 50) {
+    results.push({ ...res, fail: true, severity: 1, reason: 'wrong_order' });
+    person.expr('angry'); await faceCam(person, 0.5);
+    await G.say(pick(FD.FOOD_REMAKE_BAD), { key: 'c', hold: 0.9 }); P.saidLast = true;
+    return;
+  }
+  results[results.indexOf(worst)] = { ...res, score: Math.max(res.score, worst.score) };
+  if (!deserved) { P.sorryTip = true; M.unlock('picky_customer'); }
+  person.expr(deserved ? 'happy' : 'smile'); await faceCam(person, 0.5);
+  await G.say(pick(deserved ? FD.FOOD_REMAKE_OK : FD.FOOD_REMAKE_SORRY), { key: 'c', hold: 1 }); P.saidLast = true;
+}
+
 async function runPatient(c, idx, total, hooks = {}) {
   ui.setHUD({ patient: `${G.food ? 'Customer' : 'Patient'} ${idx + 1}/${total}${c.inspector ? ' · Inspector' : c.emergency ? ' · Rush order' : ''}` });
   let person, parent = null;
@@ -601,6 +665,13 @@ async function runPatient(c, idx, total, hooks = {}) {
     await E.home(0.6);
     if (res.fail) break;
   }
+  // ---------- "you got my order wrong!" (Doctor Burger) ----------
+  if (G.food && !G.tutorial && results.length && !results.some(r => r.fail) && !hooks.noComplaints) {
+    const worst = results.reduce((a, r) => (r.score < a.score ? r : a));
+    const deserved = worst.score < 62 && Math.random() < 0.75;
+    const picky = !deserved && Math.random() < 0.12 + C.rankInfo(state.rank || 0).tier * 0.015;
+    if (deserved || picky || G.forceWrongOrder) await wrongOrder(P, results, worst, deserved);
+  }
   // ---------- evaluate ----------
   const fail = results.some(r => r.fail);
   const severity = Math.max(0, ...results.map(r => r.severity || 0));
@@ -608,10 +679,12 @@ async function runPatient(c, idx, total, hooks = {}) {
   let score = results.reduce((a, r) => a + r.score, 0) / Math.max(1, results.length);
   if (extra && extra.score !== undefined) score = score * 0.8 + extra.score * 0.2;
   score = clamp(score - wrong * 6 - (P.lateTools || 0) * 8, 0, 100);
-  const stars = fail ? 0 : score >= 88 ? 3 : score >= 65 ? 2 : 1;
+  // a coupon instead of a remake: one star at most, and the coupon comes out of the pay
+  const stars = fail ? 0 : P.coupon ? 1 : score >= 88 ? 3 : score >= 65 ? 2 : 1;
   const raise = C.payMult(state.rank || 0) * boostNow();
-  let pay = fail ? 0 : Math.round(c.basePay * raise * [0, 0.6, 0.82, 1][stars]);
-  const tip = !fail && stars === 3 && P.mood > 55 ? Math.round(c.basePay * raise * (0.15 + 0.05 * upgEff('lolli'))) : 0;
+  let pay = fail ? 0 : Math.round(c.basePay * raise * [0, 0.6, 0.82, 1][stars] * (P.coupon ? 0.6 : 1));
+  // a picky customer who turns out to be wrong leaves a sorry tip
+  const tip = !fail && ((stars === 3 && P.mood > 55) || P.sorryTip) ? Math.round(c.basePay * raise * (0.15 + 0.05 * upgEff('lolli') + (P.sorryTip ? 0.15 : 0))) : 0;
   const escaped = extra && extra.caught === false;
   person = P.person;
   if (stars === 3) M.unlock('three_stars');
@@ -621,7 +694,7 @@ async function runPatient(c, idx, total, hooks = {}) {
   // reaction
   if (!escaped) {
     if (fail) { person.expr(c.special === 'baby' ? 'cry' : pick(['angry', 'angry', 'yell', 'cry'])); if (c.special !== 'baby') await faceCam(person, 0.5); if (c.special === 'baby') await ui.say(() => parent.headTop(), pick(['My lawyer will be calling.', 'We are LEAVING.']), { name: c.parent.title, key: 'parent', hold: 1, voice: voiceOf({ name: c.parent.first || c.parent.title, gender: c.parent.look && c.parent.look.gender, ageGroup: 'adult' }) }); else { const stepFail = !G.food && failRes && Math.random() < 0.65 ? stepLine(failRes.step, 'fail', c.ageGroup) : null; await G.say(c.fail || stepFail || pick(G.food ? FD.FOOD_FAIL : D.FAIL), { key: 'c', hold: 0.8 }); } }
-    else if (c.special !== 'baby') { person.expr(pick(['happy', 'happy', 'laugh'])); await faceCam(person, 0.5); const stepWin = !G.food && c.personality === 'normal' && Math.random() < 0.6 ? stepLine(pick(c.steps), 'success', c.ageGroup) : null;
+    else if (c.special !== 'baby' && !P.saidLast) { person.expr(pick(['happy', 'happy', 'laugh'])); await faceCam(person, 0.5); const stepWin = !G.food && c.personality === 'normal' && Math.random() < 0.6 ? stepLine(pick(c.steps), 'success', c.ageGroup) : null;
       await G.say(c.success || stepWin || pick((G.food ? FD.FOOD_SUCCESS : D.SUCCESS)[c.ageGroup] || D.SUCCESS.adult), { key: 'c', hold: 0.8 }); }
   }
   // results card
@@ -713,7 +786,7 @@ function planDay(day) {
   if (state.plan && state.plan.day === day) return state.plan;
   if (state.nextSpecialDay == null) state.nextSpecialDay = day + pick([0, 1]);
   let special = null;
-  if (day >= state.nextSpecialDay || C.twists(state.rank || 0).specialDaily) {
+  if (day >= state.nextSpecialDay || C.twists(state.rank || 0).specialDaily || eventOn('specials')) {
     if (!state.specialBag || !state.specialBag.length) {
       let bag = shuffle(D.SPECIAL_TYPES);
       if (bag[0] === state.lastSpecial) bag.push(bag.shift());
@@ -744,6 +817,23 @@ function dayLine(day) {
   return pick(G.food ? FD.FOOD_FORECAST : D.FORECAST);
 }
 
+// today's line of patients (or customers) for the current job
+function makeLine(day, count) {
+  const plan = planDay(day);
+  const used = new Set(state.usedExcuses || []);
+  const rk = state.rank || 0, info = C.rankInfo(rk), tw = C.twists(rk);
+  const n = count || tw.patients;
+  let list = G.food ? FD.generateOrderDay(day, { n, tier: info.tier }) : D.generateDay(day, { used, special: count ? null : plan.special, persona: plan.persona, rank: rk, n, twoChance: tw.twoChance, stepBias: info.steps, ageBias: info.ages });
+  list = list.slice(0, n);
+  state.usedExcuses = [...used];
+  // promoted doctors get inspectors and emergencies
+  const normal = list.map((c, i) => (c.special ? -1 : i)).filter(i => i > 0 || count);
+  const order = shuffle(normal);
+  if (tw.inspector && order.length) list[order.pop()].inspector = true;
+  for (let k = 0; k < tw.emergencies && order.length; k++) list[order.pop()].emergency = true;
+  return JSON.parse(JSON.stringify(list));
+}
+
 async function playDay() {
   G.tutorial = false;
   await M.claimGifts();
@@ -753,17 +843,16 @@ async function playDay() {
   ui.setHUD({ day, money: state.money, patient: '' });
   // Resume a day that was left part way through, at the next patient.
   let run = state.dayRun && state.dayRun.day === day && Array.isArray(state.dayRun.list) && state.dayRun.idx < state.dayRun.list.length ? state.dayRun : null;
+  // a job change part way through the day: the people still waiting are swapped for ones who fit the new job
+  if (run && (run.redo || run.list.slice(run.idx).some(c => !!c.food !== !!G.food))) {
+    const left = run.list.length - run.idx;
+    const fresh = makeLine(day, left);
+    run.list = [...run.list.slice(0, run.idx), ...fresh];
+    delete run.redo;
+    writeSave();
+  }
   if (!run) {
-    const plan = planDay(day);
-    const used = new Set(state.usedExcuses || []);
-    const rk = state.rank || 0, info = C.rankInfo(rk), tw = C.twists(rk);
-    const list = G.food ? FD.generateOrderDay(day, { n: tw.patients, tier: info.tier }) : D.generateDay(day, { used, special: plan.special, persona: plan.persona, rank: rk, n: tw.patients, twoChance: tw.twoChance, stepBias: info.steps, ageBias: info.ages });
-    state.usedExcuses = [...used];
-    // promoted doctors get inspectors and emergencies
-    const normal = list.map((c, i) => (c.special ? -1 : i)).filter(i => i > 0);
-    const order = shuffle(normal);
-    if (tw.inspector && order.length) list[order.pop()].inspector = true;
-    for (let k = 0; k < tw.emergencies && order.length; k++) list[order.pop()].emergency = true;
+    const list = makeLine(day);
     run = state.dayRun = { day, list: JSON.parse(JSON.stringify(list)), idx: 0, out: [], startMoney: state.money };
     writeSave();
     await E.home(0.6);
@@ -783,6 +872,8 @@ async function playDay() {
     });
   }
   while (run.idx < run.list.length) {
+    const sent = sentPatient(day);
+    if (sent) { run.list.splice(run.idx, 0, sent); writeSave(); }
     const r = await runPatient(run.list[run.idx], run.idx, run.list.length);
     run.out.push({ name: r.c.name, stars: r.stars, pay: r.pay, lawsuit: r.lawsuit ? { amount: r.lawsuit.amount } : null, review: r.review, fail: r.fail });
     run.idx++;
@@ -853,7 +944,9 @@ function setRank(r, { keepUpgrades = false } = {}) {
   state.rank = Math.max(0, Math.min(C.MAX_RANK, r | 0));
   if (!keepUpgrades) state.upgrades = { u0: 0, u1: 0, u2: 0, u3: 0, coats: state.upgrades.coats || 0 };
   M.bump('promotions', 0);
-  if (C.isFood(state.rank) !== C.isFood(was)) applyTheme();
+  // the new job starts now: the room changes, and anyone still waiting today is replaced by
+  // people who belong at the new job (customers at Doctor Burger, patients at the hospital)
+  if (state.rank !== was) { applyTheme(); if (state.dayRun) state.dayRun.redo = true; }
 }
 
 async function promote() {
@@ -949,6 +1042,21 @@ async function shop() {
 }
 
 // Gifts and changes sent from the creator's admin panel.
+const VISITOR_TITLES = { runner: 'a runner', baby: 'a baby', sneezy: 'a sneezer', hider: 'a hider', scooter: 'a scooter thief', germs: 'a kid full of germs', triplets: 'triplets', lightsout: 'a lights-out prankster', vampire: 'the vampire', pirate: 'the pirate', trench: 'a very tall adult', mime: 'the mime', influencer: 'the influencer', grandma: 'Grandma Bertha', ticklish: 'a ticklish patient', conspiracy: 'Kevin Truthseeker' };
+// a patient the creator sent: they cut in line as the next patient
+function sentPatient(day) {
+  const v = state.sendPatient;
+  if (!v || G.food) return null;
+  state.sendPatient = null;
+  const used = new Set(state.usedExcuses || []);
+  let c;
+  try { c = D.PERSONA_NAMES.includes(v) ? D.personaPatient(v, used) : D.testSpecialPatient(v, used); } catch (e) { console.error(e); return null; }
+  if (!c) return null;
+  c.basePay = 90 + day * 15 + 40;
+  c.sentBy = true;
+  return JSON.parse(JSON.stringify(c));
+}
+
 function applyGift(g) {
   const a = g.action || { type: 'gift', money: g.money, upgrades: g.upgrades };
   const names = [];
@@ -976,6 +1084,9 @@ function applyGift(g) {
       break;
     }
     case 'unlockAwards': M.unlockAll(); names.push('every award unlocked'); break;
+    case 'patient': state.sendPatient = a.value; names.push(`A special visitor is on the way: <b>${VISITOR_TITLES[a.value] || a.value}</b>${G.food ? ' (when you are back at the hospital)' : ''}`); break;
+    case 'cheat': M.settings.cheats[a.mode] = !!a.on; M.saveSettings(); M.applySettings(); names.push(`<b>${M.CHEAT_NAMES[a.mode] || a.mode}</b> turned ${a.on ? 'on' : 'off'}`); break;
+    case 'cheer': names.push(`<b>“${a.text}”</b>`); break;
     case 'unlockCodes': for (const w of a.codes || []) M.enterCode(w, { quiet: true }); names.push('every secret code used'); break;
     case 'reset': { const keepSeen = state.seen; state = fresh(); state.tutorialDone = true; state.seen = keepSeen; M.profile.counters.earned = 0; M.profile.counters.days = 0; M.saveProfile(); applyTheme(); names.push('a brand new start'); break; }
     default: break;
@@ -1227,6 +1338,8 @@ if (lineup !== null) {
   document.getElementById('loading')?.remove();
   document.getElementById('title').classList.add('hidden');
   const ages = ['kid', 'adult', 'elder', 'teen', 'kid', 'adult', 'teen', 'elder'];
+  const wear = new URLSearchParams(location.search).get('wear');   // ?lineup&wear=cape shows department outfits
+  if (wear) FLAGS.wear = wear;
   const people = ages.map((a, i) => { const p = new Person(D.randomLook(a, i % 2 ? 'f' : 'm')); p.placeStanding(-2.45 + i * 0.7, 1.4, 0); p.setPose('stand', true); if (lineup === 'expr') p.expr(['smile', 'happy', 'angry', 'sad', 'scared', 'laugh', 'smug', 'ouch'][i]); E.scene.add(p.root); return p; });
   nurse.root.visible = false;
   E.onUpdate((dt, t) => people.forEach(p => p.update(dt, t)));
@@ -1258,7 +1371,9 @@ if (lineup !== null) {
     if (step === 'swallowed') c.params.surgery = { variant: 'object', object: 'duck', name: 'rubber duck' };
     if (new URLSearchParams(location.search).get('variant')) c.params.steth = { variant: new URLSearchParams(location.search).get('variant') };
     window.__testCase = c;
-    const r = await runPatient(c, 0, 1);
+    // test pages: no surprise complaints unless asked for with &wrong (which forces one)
+    G.forceWrongOrder = qs.has('wrong');
+    const r = await runPatient(c, 0, 1, { noComplaints: !qs.has('wrong') });
     window.__testResult = r;
     console.log('TEST_DONE', JSON.stringify({ stars: r.stars, pay: r.pay, fail: r.fail }));
   })();

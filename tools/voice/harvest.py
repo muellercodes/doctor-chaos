@@ -45,8 +45,9 @@ async (STATIC) => {
   walk(D.WRONG_TOOL, PAT, 'WRONG_TOOL'); walk(D.IMPATIENT, PAT, 'IMPATIENT'); walk(D.PICKLES_LINES, PAT, 'PICKLES');
   walk(D.NURSE_QUIPS, ['nurse'], 'NURSE_QUIPS');
   walk(ST.STEP_TALK, PAT, 'STEP_TALK');
-  for (const k of ['FOOD_REMARKS', 'FOOD_WRONG', 'FOOD_IMPATIENT', 'FOOD_SUCCESS', 'FOOD_FAIL', 'FOOD_REFUND']) if (F[k]) walk(F[k], PAT, k);
+  for (const k of ['FOOD_REMARKS', 'FOOD_WRONG', 'FOOD_IMPATIENT', 'FOOD_SUCCESS', 'FOOD_FAIL', 'FOOD_REFUND', 'FOOD_ANGRY', 'FOOD_PICKY', 'FOOD_REMAKE_OK', 'FOOD_REMAKE_SORRY', 'FOOD_REMAKE_BAD', 'FOOD_COUPON']) if (F[k]) walk(F[k], PAT, k);
   walk(F.FOOD_QUIPS, ['nurse'], 'FOOD_QUIPS');
+  if (F.MANAGER_REMAKE) walk(F.MANAGER_REMAKE, ['nurse'], 'MANAGER_REMAKE');
 
   // every excuse, with every fill-in word
   const OBJS = [...new Set(Object.values(PR.OBJECT_NAMES))];

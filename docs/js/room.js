@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toon, canvasTexture, TABLE_TOP, ease, rand } from './engine.js';
+import { drawPoster, drawSky, drawIcon } from './themes.js';
 
 export function box(w, h, d, color, x = 0, y = 0, z = 0, cast = true) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof color === 'string' ? toon(color) : color);
@@ -85,10 +86,12 @@ export function buildRoom(scene) {
   scene.add(floor);
 
   const wallC = '#dff3ee', wainC = '#9fd8cc', trimC = '#ff8a2a';
-  const wallTex = canvasTexture(256, 256, (ctx, W, H) => {
-    ctx.fillStyle = wallC; ctx.fillRect(0, 0, W, H);
+  const paintWall = (ctx, W, H, base) => {
+    ctx.fillStyle = base; ctx.fillRect(0, 0, W, H);
     for (let k = 0; k < 2600; k++) { ctx.fillStyle = Math.random() < 0.5 ? 'rgba(0,40,30,0.035)' : 'rgba(255,255,255,0.08)'; ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2); }
-  }).tex;
+  };
+  const wallCT = canvasTexture(256, 256, (ctx, W, H) => paintWall(ctx, W, H, wallC));
+  const wallTex = wallCT.tex;
   wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(4, 2);
   const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.92 });
   const back = box(9.4, 3.6, 0.1, wallMat, 0, 1.8, -2.65, false); scene.add(back);
@@ -101,12 +104,13 @@ export function buildRoom(scene) {
   // ceiling light panels (they glow a little)
   const panelMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff8e8', emissiveIntensity: 0.9 });
   for (const [x, z] of [[-1.6, -0.6], [1.6, -0.6], [-1.6, 1.4], [1.6, 1.4]]) { const pnl = box(1.1, 0.04, 0.55, panelMat, x, 3.58, z, false); scene.add(pnl); scene.add(box(1.16, 0.03, 0.61, '#cfd8dc', x, 3.6, z, false)); }
-  scene.add(box(9.4, 1.0, 0.04, wainC, 0, 0.5, -2.59, false));
-  scene.add(box(0.04, 1.0, 7.5, wainC, -4.59, 0.5, 0.9, false));
-  scene.add(box(0.04, 1.0, 7.5, wainC, 4.59, 0.5, 0.9, false));
-  scene.add(box(9.4, 0.07, 0.06, trimC, 0, 1.02, -2.58, false));
-  scene.add(box(0.06, 0.07, 7.5, trimC, -4.58, 1.02, 0.9, false));
-  scene.add(box(0.06, 0.07, 7.5, trimC, 4.58, 1.02, 0.9, false));
+  const wainMat = toon(wainC), trimMat = toon(trimC);
+  scene.add(box(9.4, 1.0, 0.04, wainMat, 0, 0.5, -2.59, false));
+  scene.add(box(0.04, 1.0, 7.5, wainMat, -4.59, 0.5, 0.9, false));
+  scene.add(box(0.04, 1.0, 7.5, wainMat, 4.59, 0.5, 0.9, false));
+  scene.add(box(9.4, 0.07, 0.06, trimMat, 0, 1.02, -2.58, false));
+  scene.add(box(0.06, 0.07, 7.5, trimMat, -4.58, 1.02, 0.9, false));
+  scene.add(box(0.06, 0.07, 7.5, trimMat, 4.58, 1.02, 0.9, false));
 
   // ---------- exam table ----------
   const table = new THREE.Group();
@@ -163,16 +167,18 @@ export function buildRoom(scene) {
     let y = 26;
     for (const [t, s] of rows) { y += s; ctx.font = `700 ${s}px Arial, sans-serif`; ctx.fillText(t, W / 2, y); y += 12; }
   }, 2).tex;
-  scene.add(planeTex(0.62, 0.86, eye, 1.25, 1.62, -2.585));
-  scene.add(planeTex(0.72, 0.54, textPoster([
+  const eyeChart = planeTex(0.62, 0.86, eye, 1.25, 1.62, -2.585); scene.add(eyeChart);
+  const washPoster = planeTex(0.72, 0.54, textPoster([
     { text: 'WASH YOUR', size: 64, bold: true }, { text: 'HANDS', size: 96, bold: true, color: '#2bb3a3' }, { text: '(please)', size: 40 },
-  ]), -2.55, 1.5, -2.585));
+  ]), -2.55, 1.5, -2.585); scene.add(washPoster);
   scene.add(planeTex(0.58, 0.44, textPoster([
     { text: 'DIPLOMA', size: 56, bold: true, color: '#b5651d' }, { text: 'Doctor of Medicine', size: 34 }, { text: '(ish)', size: 30 }, { text: 'Online University', size: 28, color: '#666' },
   ], { bg: '#fff8e1', border: '#c9a227' }), 2.2, 1.95, -2.585));
 
   // ---------- window ----------
-  const sky = canvasTexture(512, 352, (ctx, W, H) => {
+  const skyCT = canvasTexture(512, 352, (ctx, W, H) => drawSky(ctx, W, H, 'day'));
+  const sky = skyCT.tex;
+  const oldSky = canvasTexture(8, 8, (ctx, W, H) => {
     const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#6ec6ff'); g.addColorStop(1, '#d6f0ff');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
@@ -183,6 +189,7 @@ export function buildRoom(scene) {
     ctx.fillStyle = '#5d4037'; ctx.fillRect(90, 210, 18, 90);
     ctx.fillStyle = '#43a047'; ctx.beginPath(); ctx.arc(99, 200, 52, 0, 7); ctx.fill();
   }).tex;
+  oldSky.dispose();
   const winM = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.1), new THREE.MeshBasicMaterial({ map: sky }));
   winM.position.set(-0.2, 1.9, -2.595); scene.add(winM);
   scene.add(box(1.72, 0.07, 0.08, '#ffffff', -0.2, 2.48, -2.57));
@@ -453,10 +460,123 @@ export function buildRoom(scene) {
     g.traverse(o => { if (o.isMesh) o.userData.food = true; });
     return g;
   }
+  // ---------- department themes (see themes.js) ----------
+  let themePoster = null, themeSign = null, themeProps = null, themeName = null;
+  const shade = (hex, k) => { const c = new THREE.Color(hex); c.multiplyScalar(k); return '#' + c.getHexString(); };
+  R.tickers = new Set();
+  R.tick = (dt, t) => { for (const f of R.tickers) f(dt, t); };
+  R.setDept = th => {
+    const name = th ? th.name : null;
+    if (name === themeName) return;
+    themeName = name;
+    const wall = th ? th.wall : wallC;
+    paintWall(wallCT.ctx, 256, 256, wall); wallTex.needsUpdate = true;
+    wainMat.color.set(th ? shade(th.wall, 0.82) : wainC);
+    trimMat.color.set(th ? th.trim : trimC);
+    drawSky(skyCT.ctx, 512, 352, th ? th.sky : 'day'); sky.needsUpdate = true;
+    for (const o of [themePoster, themeSign]) if (o) { scene.remove(o); o.geometry.dispose(); o.material.map.dispose(); o.material.dispose(); }
+    themePoster = themeSign = null;
+    if (themeProps) { scene.remove(themeProps); themeProps.traverse(o => { if (o.geometry) o.geometry.dispose(); }); themeProps = null; }
+    R.tickers.clear();
+    washPoster.visible = !th; eyeChart.visible = true;
+    if (!th) { exitSign.visible = !food || !food.visible; return; }
+    themePoster = planeTex(0.66, 0.66, canvasTexture(512, 512, (ctx, W, H) => drawPoster(ctx, W, H, th.poster)).tex, -2.55, 1.55, -2.585);
+    scene.add(themePoster);
+    const sw = Math.min(1.25, 0.32 + th.sign.length * 0.045);
+    themeSign = planeTex(sw, 0.18, textPoster([{ text: th.sign, size: 64, bold: true, color: '#fff' }], { bg: th.trim, border: '#1d2b36', w: Math.round(512 * sw / 0.5), h: 184 }), doorX, 2.42, -2.583);
+    scene.add(themeSign);
+    exitSign.visible = false;
+    themeProps = buildProps(th);
+    scene.add(themeProps);
+    if (food && food.visible) { themePoster.visible = false; themeSign.visible = false; themeProps.visible = false; }
+  };
+  // little things in the room that make each department look like its own place
+  function buildProps(th) {
+    const g = new THREE.Group();
+    const has = k => th.props.includes(k);
+    const line = (a, b, color = '#90a4ae') => { const geo = new THREE.BufferGeometry().setFromPoints([a, b]); return new THREE.Line(geo, new THREE.LineBasicMaterial({ color })); };
+    if (has('balloons')) for (const [x, c, h] of [[-1.25, '#ff5d8f', 1.95], [-1.05, '#3ec1d3', 2.1], [-1.4, '#ffd23f', 2.2]]) {
+      const b = sph(0.13, c, x, h, -0.45, 18); b.scale.y = 1.18; g.add(b);
+      g.add(line(new THREE.Vector3(x, h - 0.15, -0.45), new THREE.Vector3(-1.1, TABLE_TOP, -0.3), '#ffffff'));
+      R.tickers.add((dt, t) => { b.position.y = h + Math.sin(t * 1.3 + x * 5) * 0.03; });
+    }
+    if (has('blocks')) [['#e63946', 0], ['#3a86ff', 1], ['#ffd23f', 2]].forEach(([c, i]) => { const b = box(0.12, 0.12, 0.12, c, -3.3 + i * 0.13, 1.03 + (i === 2 ? 0.12 : 0), -2.2); b.position.x -= i === 2 ? 0.2 : 0; b.rotation.y = i * 0.4; g.add(b); });
+    if (has('redlight')) {
+      const base = cyl(0.07, 0.08, 0.05, '#1d2b36', doorX, 2.72, -2.57, 14); base.rotation.x = Math.PI / 2; g.add(base);
+      const lamp = sph(0.075, new THREE.MeshStandardMaterial({ color: '#ff1744', emissive: '#ff1744', emissiveIntensity: 0.6 }), doorX, 2.72, -2.5, 14); g.add(lamp);
+      R.tickers.add((dt, t) => { lamp.material.emissiveIntensity = 0.2 + Math.max(0, Math.sin(t * 7)) * 1.4; });
+    }
+    if (has('crutches')) for (const dx of [0, 0.12]) { const c = cyl(0.016, 0.016, 1.3, '#b0bec5', 0.55 + dx, 0.66, -2.5, 8); c.rotation.z = 0.12; g.add(c); g.add(box(0.16, 0.04, 0.05, '#546e7a', 0.47 + dx, 1.3, -2.5)); }
+    if (has('lightbox')) {
+      eyeChart.visible = false;
+      const lb = planeTex(0.7, 0.86, canvasTexture(320, 400, (ctx, W, H) => {
+        ctx.fillStyle = '#cfe8ff'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#16212e'; ctx.fillRect(18, 18, W - 36, H - 36);
+        drawIcon(ctx, 'skull', W / 2, H * 0.28, 1.1, '#e3f2fd');
+        ctx.strokeStyle = '#e3f2fd'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(W / 2, H * 0.42); ctx.lineTo(W / 2, H * 0.85); ctx.stroke();
+        for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(W / 2, H * 0.48 + i * 22, 70 - i * 6, 10, 0, 0, Math.PI); ctx.stroke(); }
+      }).tex, 1.25, 1.62, -2.583);
+      lb.material = new THREE.MeshBasicMaterial({ map: lb.material.map }); g.add(lb);
+    }
+    if (has('hazard')) {
+      const sign = new THREE.Group(); sign.position.set(2.35, 0, -1.9); sign.rotation.y = -0.4;
+      for (const sx of [-1, 1]) { const pnl = box(0.34, 0.6, 0.02, '#ffd23f', 0, 0.3, sx * 0.09); pnl.rotation.x = sx * 0.28; sign.add(pnl); }
+      const lab = planeTex(0.28, 0.28, canvasTexture(256, 256, (ctx, W, H) => { ctx.fillStyle = '#ffd23f'; ctx.fillRect(0, 0, W, H); drawIcon(ctx, 'germ', W / 2, H * 0.42, 0.9, '#7cb342'); ctx.fillStyle = '#1d2b36'; ctx.font = '700 40px Arial'; ctx.textAlign = 'center'; ctx.fillText('CAUTION', W / 2, H * 0.92); }).tex, 0, 0.36, 0.12);
+      lab.rotation.x = -0.28; sign.add(lab); g.add(sign);
+    }
+    if (has('balls')) { const bb = sph(0.12, '#ff7043', -3.6, 1.07, -2.15, 18); g.add(bb); const sb = sph(0.11, '#ffffff', -3.25, 1.06, -2.2, 18); g.add(sb); }
+    if (has('rocker')) {
+      const ch = new THREE.Group(); ch.position.set(2.65, 0, -1.95); ch.rotation.y = -0.6;
+      ch.add(box(0.5, 0.06, 0.45, '#8d6e63', 0, 0.45, 0)); ch.add(box(0.5, 0.6, 0.06, '#8d6e63', 0, 0.78, -0.2));
+      for (const sx of [-1, 1]) { ch.add(box(0.05, 0.42, 0.05, '#6d4c41', sx * 0.22, 0.24, 0.17)); ch.add(box(0.05, 0.42, 0.05, '#6d4c41', sx * 0.22, 0.24, -0.17)); const run = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.02, 6, 24, 0.9), toon('#6d4c41')); run.rotation.set(0, Math.PI / 2, -Math.PI / 2 - 0.45); run.position.set(sx * 0.22, 0.62, 0); ch.add(run); }
+      ch.add(box(0.46, 0.05, 0.42, '#c5e1a5', 0, 0.49, 0));
+      g.add(ch); R.tickers.add((dt, t) => { ch.rotation.x = Math.sin(t * 1.1) * 0.05; });
+    }
+    if (has('planets')) for (const [x, z, r, c, h] of [[-1.35, -1.9, 0.15, '#ffb74d', 2.45], [0.95, -2.1, 0.1, '#4fc3f7', 2.6], [2.35, -1.7, 0.19, '#ab47bc', 2.3]]) {
+      const pl = sph(r, c, x, h, z, 20); g.add(pl); g.add(line(new THREE.Vector3(x, h + r, z), new THREE.Vector3(x, 3.6, z), '#cfd8dc'));
+      if (r > 0.15) { const ring = new THREE.Mesh(new THREE.TorusGeometry(r * 1.6, r * 0.12, 6, 30), toon('#ffe0b2')); ring.position.copy(pl.position); ring.rotation.x = 1.2; g.add(ring); }
+      R.tickers.add((dt, t) => { pl.rotation.y = t * 0.4; pl.position.y = h + Math.sin(t * 0.8 + x) * 0.02; });
+    }
+    if (has('helmet')) { const hm = sph(0.16, '#eceff1', -2.05, 1.12, -2.3, 22); g.add(hm); const visor = new THREE.Mesh(new THREE.SphereGeometry(0.163, 22, 14, -0.9, 1.8, 0.7, 1.2), new THREE.MeshStandardMaterial({ color: '#263238', metalness: 0.6, roughness: 0.15 })); visor.position.copy(hm.position); g.add(visor); }
+    if (has('bubbles')) {
+      const n = 26, geo = new THREE.SphereGeometry(0.03, 10, 8);
+      const mat = new THREE.MeshStandardMaterial({ color: '#e1f5fe', transparent: true, opacity: 0.55, roughness: 0.1 });
+      const im = new THREE.InstancedMesh(geo, mat, n); g.add(im);
+      const bs = Array.from({ length: n }, (_, i) => ({ x: rand(-4.2, 4.2), z: rand(-2.5, -1.0), y: rand(0, 3.4), v: rand(0.18, 0.4), s: rand(0.5, 1.5), w: rand(0, 6) }));
+      const m4 = new THREE.Matrix4();
+      R.tickers.add((dt, t) => { bs.forEach((b, i) => { b.y += b.v * dt; if (b.y > 3.5) b.y = 0; m4.makeScale(b.s, b.s, b.s); m4.setPosition(b.x + Math.sin(t * 1.5 + b.w) * 0.05, b.y, b.z); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; });
+    }
+    if (has('seaweed')) for (let i = 0; i < 7; i++) {
+      const x = -4.3 + i * 0.22 + (i > 3 ? 6.6 : 0), hgt = rand(0.8, 1.5);
+      const wd = new THREE.Mesh(new THREE.PlaneGeometry(0.12, hgt, 1, 8), toon(i % 2 ? '#2e7d32' : '#43a047', { side: THREE.DoubleSide }));
+      wd.position.set(x, hgt / 2, -2.5); g.add(wd);
+      const pos = wd.geometry.attributes.position, base = Float32Array.from(pos.array);
+      R.tickers.add((dt, t) => { for (let k = 0; k < pos.count; k++) { const yy = base[k * 3 + 1] + hgt / 2; pos.array[k * 3] = base[k * 3] + Math.sin(t * 1.6 + yy * 3 + i) * 0.05 * yy; } pos.needsUpdate = true; });
+    }
+    if (has('egg')) {
+      const nest = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.08, 8, 20), toon('#a1887f')); nest.rotation.x = Math.PI / 2; nest.position.set(2.6, 0.07, -1.9); g.add(nest);
+      const egg = sph(0.2, new THREE.MeshStandardMaterial({ map: canvasTexture(128, 128, (ctx, W, H) => { ctx.fillStyle = '#f1f8e9'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#7cb342'; for (let i = 0; i < 40; i++) { ctx.beginPath(); ctx.arc(Math.random() * W, Math.random() * H, 3 + Math.random() * 5, 0, 7); ctx.fill(); } }).tex, roughness: 0.7 }), 2.6, 0.26, -1.9, 22);
+      egg.scale.set(1, 1.3, 1); g.add(egg);
+      R.tickers.add((dt, t) => { egg.rotation.z = Math.sin(t * 9) * 0.06 * Math.max(0, Math.sin(t * 0.7)); });
+    }
+    if (has('footprints')) for (let i = 0; i < 5; i++) {
+      const fp = new THREE.Mesh(new THREE.CircleGeometry(0.11, 3), new THREE.MeshBasicMaterial({ color: '#8d6e63', transparent: true, opacity: 0.5 }));
+      fp.rotation.x = -Math.PI / 2; fp.rotation.z = Math.PI / 2 + 0.3; fp.position.set(3.2 - i * 0.45, 0.006, -1.4 + (i % 2) * 0.28 + i * 0.25); g.add(fp);
+    }
+    if (has('capes')) for (const [x, c] of [[3.0, '#d32f2f'], [3.55, '#1e88e5']]) {
+      const hook = sph(0.025, '#90a4ae', x, 1.95, -2.47, 8); g.add(hook);
+      const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.8, 4, 6), toon(c, { side: THREE.DoubleSide }));
+      const pos = cape.geometry.attributes.position; for (let k = 0; k < pos.count; k++) { const yy = pos.getY(k); pos.setX(k, pos.getX(k) * (0.55 + (0.4 - yy) * 0.6)); pos.setZ(k, Math.sin(pos.getX(k) * 12) * 0.02); }
+      cape.geometry.computeVertexNormals(); cape.position.set(x, 1.55, -2.42); g.add(cape);
+      const star = new THREE.Mesh(new THREE.CircleGeometry(0.07, 5), toon('#ffd23f')); star.position.set(x, 1.6, -2.4); g.add(star);
+    }
+    return g;
+  }
   R.setFood = on => {
     if (on && !food) { food = buildFood(); scene.add(food); }
     if (food) food.visible = !!on;
-    exitSign.visible = !on;
+    exitSign.visible = !on && !themeSign;
+    for (const o of [themePoster, themeSign, themeProps]) if (o) o.visible = !on;
   };
   return R;
 }

@@ -1,6 +1,6 @@
 {
   "name": "doctor-chaos",
-  "version": "1.4.0",
+  "version": "1.7.0",
   "private": true,
   "description": "A goofy 3D doctor game in the browser. Game design by Linus.",
   "scripts": {

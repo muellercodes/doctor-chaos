@@ -118,7 +118,7 @@ export async function play(G, P) {
   // ---- 3: bandage ----
   G.dbg.phase = 'stick';
   E.input.requireRelease();
-  ui.hint('The bandage wiggles. <b>Click</b> when it lines up with the dotted outline!');
+  ui.hint(E.coarse ? 'The bandage wiggles. Drag it over the outline and <b>let go</b> when it lines up!' : 'The bandage wiggles. <b>Click</b> when it lines up with the dotted outline!');
   const band = bandageProp(G.bandageColor || '#ffcc80'); band.scale.setScalar(s * 1.6); S.add(band);
   const ghostMat = new THREE.LineDashedMaterial({ color: '#ffffff', dashSize: 0.006, gapSize: 0.005, depthTest: false }); ghostMat.userData.dispose = true;
   const gw = 0.144 * s, gh = 0.056 * s;
@@ -141,7 +141,7 @@ export async function play(G, P) {
       if (p) band.position.copy(p);
       band.rotation.set(0, 0, ang);
     });
-    S.on('down', async () => {
+    S.pick(async () => {
       if (stuck) return;
       const p = E.pointerOnPlane(plane) || center();
       const posErr = Math.hypot(p.x - center().x, p.y - center().y);
@@ -159,7 +159,7 @@ export async function play(G, P) {
         G.say(pick(MISS), { key: 'c', hold: 0.6 });
         if (tries >= 3) { stuck = true; res(); }
       }
-    });
+    }, 'aim');
   });
   ghost.visible = false; ui.hint(null);
   await E.wait(0.5);

@@ -87,7 +87,7 @@ export async function play(G, P) {
   let t = 0, pokes = 0, found = 0, done = false;
   const limit = G.tutorial ? 60 : 32 - diff * 7;
   ui.timer.show(limit);
-  ui.hint(`Find <b>${n}</b> hidden things in the ear. Tap each one!`);
+  ui.hint(E.coarse ? `Drag to look around. Find <b>${n}</b> hidden things and <b>tap</b> each one!` : `Find <b>${n}</b> hidden things in the ear. Click each one!`);
   const foundM = ui.meter({ label: `Found 0 of ${n}`, value: 0, fill: '#2bb3a3' });
   G.dbg = { kind: 'otoscope', items, lens, lensR };
   let endRes;
@@ -116,7 +116,8 @@ export async function play(G, P) {
     ui.timer.set(limit - t);
     if (!done && t > limit) { done = true; endRes('time'); }
   });
-  S.on('down', () => {
+  // dragging moves the light; a tap picks (so looking around never pokes the ear)
+  S.pick(() => {
     if (done) return;
     const x = E.input.cx, y = E.input.cy;
     const hit = items.find(it => !it.found && Math.hypot(it.x + jig.x - x, it.y + jig.y - y) < 26 * it.s && Math.hypot(it.x + jig.x - lens.x, it.y + jig.y - lens.y) < lensR + 10);
@@ -131,7 +132,7 @@ export async function play(G, P) {
       ui.pop('Ow!', x, y - 20, 'bad');
       if (pokes % 2 === 1) G.say(pick(POKE), { key: 'c', hold: 0.6 });
     }
-  });
+  }, 'explore');
   const how = await ended;
   ui.timer.hide(); foundM.remove(); ui.hint(null);
   await E.wait(0.4);

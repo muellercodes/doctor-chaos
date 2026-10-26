@@ -49,7 +49,7 @@ export async function play(G, P) {
   const plane = () => new THREE.Plane(new THREE.Vector3(0, 1, 0), -height());
   const aimPt = () => { const e = eyeW(targetEye()); return new THREE.Vector3(e.x, height(), e.z); };
   G.dbg = { kind: 'drops', aim: aimPt, open: () => face.eyeOpen > 0.75 && face.blinking <= 0 && blinkWait > 0.45, falling: () => !!falling };
-  ui.hint('Hold the dropper over an eye, then <b>click</b> when it is open!');
+  ui.hint(E.coarse ? 'Drag the dropper over an eye and <b>let go</b> when it is open!' : 'Hold the dropper over an eye, then <b>click</b> when it is open!');
   let endRes;
   const ended = new Promise(r => { endRes = r; });
   S.update((dt, t) => {
@@ -87,8 +87,11 @@ export async function play(G, P) {
       if (misses >= 6 && !finished) { finished = true; endRes(true); }
     }
   }
-  S.on('down', () => {
+  // drag the dropper into place and let go to drop (a quick tap drops where you tap)
+  S.pick(() => {
     if (falling || finished) return;
+    const p0 = E.pointerOnPlane(plane());
+    if (p0) dr.position.copy(p0);
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.006 * s / person.s * person.s, 10, 8), new THREE.MeshStandardMaterial({ color: '#7fdbff' }));
     m.material.userData.dispose = true; m.scale.y = 1.3;
     m.position.copy(dr.position); S.add(m);
@@ -96,7 +99,7 @@ export async function play(G, P) {
     flinchArmed = !G.tutorial && Math.random() < 0.12 + diff * 0.12;
     sfx.blip(1.8);
     dr.userData.bulb.scale.set(0.8, 1.1, 0.8); setTimeout(() => dr.userData.bulb.scale.set(1, 1.4, 1), 140);
-  });
+  }, 'aim');
   const failed = await ended;
   ring.visible = false; ui.hint(null);
   await E.wait(0.5);

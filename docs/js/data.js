@@ -28,6 +28,13 @@ const HAIR_FUN = ['#ff5d8f', '#3ec1d3', '#9b5de5', '#06d6a0'];
 const SHIRTS = ['#2f4b7c', '#8a9bb0', '#b23a48', '#3e6b5a', '#d9d4c7', '#5b6770', '#c96f3b', '#4f6d9a', '#7a4e6e', '#e8e4da', '#3a3f47', '#a88f5c', '#6b8f71', '#c9a227'];
 const KID_SHIRTS = ['#3a86ff', '#ff8a2a', '#e63946', '#2ec4b6', '#ffd166', '#9b5de5', '#8ac926'];
 const PANTS = ['#3d5a80', '#2b4a6f', '#34495e', '#2b2d42', '#7f6a4f', '#495057', '#5c4b3b', '#3b5998', '#bfae8e'];
+// pants that are close to the skin color look like bare legs, so pick ones that stand apart
+const hexRGB = hx => [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+const colorGap = (a, b) => { const x = hexRGB(a), y = hexRGB(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
+function pantsFor(skin) {
+  const ok = PANTS.filter(p => !skin || colorGap(p, skin) > 90);
+  return pick(ok.length ? ok : PANTS);
+}
 const SHOES = ['#1d2b36', '#f2f2f2', '#6d4c2f', '#3a3a3a', '#8b5a2b', '#c0392b'];
 
 const NAMES = {
@@ -49,15 +56,16 @@ export function randomLook(ageGroup, gender) {
   const shirtStyle = kid ? pick(['tee', 'tee', 'tee', 'hoodie']) : teen ? pick(['tee', 'tee', 'hoodie', 'hoodie', 'polo']) : old ? pick(['button', 'sweater', 'polo', 'sweater']) : pick(['tee', 'polo', 'button', 'sweater', 'hoodie']);
   const shirt = kid && Math.random() < 0.6 ? pick(KID_SHIRTS) : pick(SHIRTS);
   const print = (kid || teen) && shirtStyle === 'tee' && Math.random() < 0.65 ? pick(['star', 'heart', 'bolt', 'smile', 'planet', 'paw', 'dino']) : null;
+  const skin = pick(SKIN);
   return {
     age: ageGroup, gender,
-    skin: pick(SKIN),
+    skin,
     hair: { style, color: hairC },
     eyes: pick(EYES),
     nose: pick(kid ? ['button', 'button', 'regular'] : ['regular', 'regular', 'long', 'wide', 'button']),
     build: kid ? pick(['slim', 'avg', 'avg']) : pick(['slim', 'avg', 'avg', 'stocky', 'round']),
     tall: kid ? rand(0.96, 1.04) : rand(0.95, 1.05),
-    shirt, pants: pick(PANTS), shoes: pick(SHOES),
+    shirt, pants: pantsFor(skin), shoes: pick(SHOES),
     shirtStyle, print, printColor: pick(PRINT_COLORS.filter(c => c !== shirt)),
     sleeves: shirtStyle === 'sweater' || shirtStyle === 'hoodie' ? 'long' : shirtStyle === 'button' ? (Math.random() < 0.6 ? 'long' : 'short') : (Math.random() < 0.25 ? 'long' : 'short'),
     shorts: kid ? Math.random() < 0.5 : teen ? Math.random() < 0.2 : false,
