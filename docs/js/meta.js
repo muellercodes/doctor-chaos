@@ -5,7 +5,7 @@ import { h } from './ui.js';
 import { icon } from './icons.js';
 export { icon };
 
-export const VERSION = '1.7.0';
+export const VERSION = '1.7.1';
 
 const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null') || {}; } catch (e) { return {}; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ } };

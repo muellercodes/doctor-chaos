@@ -536,7 +536,9 @@ export function generateDay(day, opts = {}) {
     else if (slot && slot.type === 'persona') c = PERSONALITIES[slot.p](used);
     else {
       let st = steps[si++ % steps.length];
-      if (day === 1 && i === 0) st = pick(['removal', 'shot', 'cast']);
+      // the very first patient of a new game can be anything except surgery (too hard for a first try),
+      // and not the shot or tweezers the tutorial just practiced, so every new game starts differently
+      if (day === 1 && i === 0) { const ok = s => !['surgery', 'shot', 'removal'].includes(s); if (!ok(st)) { const k = steps.findIndex((s, j) => j >= si && ok(s)); if (k >= 0) { st = steps[k]; steps.splice(k, 1); } else st = pick(ALL_STEPS.filter(ok)); } }
       c = normalPatient(ag, g, st, used);
       if ((day >= 3 || rank > 0) && Math.random() < twoChance) {
         const extra = pick(ALL_STEPS.filter(x => x !== st && x !== 'surgery'));
