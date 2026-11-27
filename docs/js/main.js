@@ -78,7 +78,31 @@ ui.onMute = m => {
   if (muteFlips.length >= 20) M.unlock('sound_toggle');
 };
 ui.onFullscreen = () => M.goFullscreen();
-// Pause menu: resume, settings, or leave to the main menu (progress is kept at the current patient).
+// Bug reports. The form is an outside script (the last line of index.html), so everything here does nothing without
+// window.BugReport and the game plays the same offline. Its floating tab is hidden while a patient is being seen,
+// where it could sit under a finger. There the pause menu has "Report a bug": the pause card is gone by the time
+// the form takes its picture, so the picture is of the clinic, and the game stays paused until the form is put away.
+const reportBug = () => new Promise(res => {
+  const B = window.BugReport; if (!B) return res();
+  addEventListener('bugreport:close', () => res(), { once: true });
+  requestAnimationFrame(() => requestAnimationFrame(() => B.open()));
+});
+setInterval(() => {
+  const B = window.BugReport; if (!B) return;
+  const title = !document.getElementById('title').classList.contains('hidden');
+  const card = !ui.modalEl.classList.contains('hidden') || (M.isPanelOpen() && !document.querySelector('.pause-card'));
+  B.showButton(title || card);
+}, 250);
+window.bugReportContext = () => {
+  const o = {};
+  try {
+    o.title = !document.getElementById('title').classList.contains('hidden');
+    o.day = state.day; o.money = state.money; o.tutorial = !!G.tutorial; o.food = !!G.food;
+    if (G.cur) { o.patient = G.cur.c.name; o.special = G.cur.c.special || null; o.steps = G.cur.c.steps; o.step = G.curStep || null; o.tool = G.stepTool || null; }
+  } catch (e) { o.error = String((e && e.message) || e); }
+  return o;
+};
+// Pause menu: resume, settings, report a bug, or leave to the main menu (progress is kept at the current patient).
 let pauseTaps = 0;
 ui.onGear = async () => {
   if (M.isPanelOpen()) return;
@@ -94,10 +118,11 @@ ui.onGear = async () => {
     const v = await M.message({
       icon: M.icon('pause'), title: 'Paused',
       html: `<p>${G.cur ? `You're with <b>${G.cur.c.name}</b>.` : 'Take a breather.'}</p>`,
-      buttons: [{ label: 'Resume', value: 'resume', cls: 'primary' }, { label: 'Settings', value: 'settings' }, { label: 'Exit to main menu', value: 'exit' }],
+      buttons: [{ label: 'Resume', value: 'resume', cls: 'primary' }, { label: 'Settings', value: 'settings' }, ...(window.BugReport ? [{ label: 'Report a bug', value: 'bug' }] : []), { label: 'Exit to main menu', value: 'exit' }],
       cls: 'pause-card',
     });
     if (v === 'settings') { await M.openSettings(); continue; }
+    if (v === 'bug') { await reportBug(); continue; }
     if (v === 'exit') {
       const sure = await M.message({ icon: M.icon('door'), title: 'Leave the clinic?', html: G.tutorial ? '<p>The tutorial will start over next time.</p>' : `<p>Your money and days are saved.${G.cur ? ' This patient will be waiting when you come back.' : ''}</p>`, buttons: [{ label: 'Stay', value: false }, { label: 'Exit to menu', value: true, cls: 'primary' }] });
       if (!sure) continue;

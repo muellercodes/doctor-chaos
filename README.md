@@ -128,6 +128,10 @@ python3 tools/voice/gen.py                      # slow: about real time on two C
 python3 tools/voice/manifest.py
 ```
 
+## Bug reports
+
+The pause menu has "Report a bug", and a small tab with a bug on it sits at the right edge of the title screen and of the cards between patients. Either one takes a picture of the screen, asks what went wrong, and sends it to [games.mueller.codes](https://games.mueller.codes), which keeps the reports for all the games. The tab is hidden while a patient is being seen, so it can never sit under a finger. The form is one outside script, the last line of `docs/index.html`; the game's side of it is `reportBug()` in `docs/js/main.js`, which also sends the day, the patient and the step. How to read the reports is in the games.mueller.codes README.
+
 ## Hosting
 
 - GitHub Pages serves the `docs/` folder from `main`.
